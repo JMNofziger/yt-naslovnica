@@ -3,7 +3,7 @@
 {% if error %}
 <p class="feed-error">{{ error }}</p>
 {% elif not items %}
-<p class="feed-empty">No items in the feed yet. Configure Firestore and run ingestion when ready.</p>
+<p class="feed-empty">Nothing in the archive yet. Older than one week posts appear here.</p>
 {% endif %}
 <div class="card-list">
   {% for item in items %}

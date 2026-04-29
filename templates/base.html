@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} · YouTube Newsfeed</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="feed-body">
+  <header class="feed-header">
+    <div class="feed-header-inner">
+      <a href="{{ url_for('index') }}" class="feed-logo">YouTube Newsfeed</a>
+      <nav class="feed-nav">
+        <a href="{{ url_for('index') }}" class="{% if active_feed %}active{% endif %}">Feed</a>
+        <a href="{{ url_for('archive') }}" class="{% if active_archive %}active{% endif %}">Archive</a>
+      </nav>
+    </div>
+  </header>
+  <main class="feed-main">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

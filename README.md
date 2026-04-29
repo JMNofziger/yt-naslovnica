@@ -2,6 +2,50 @@
 
 "Hello World" is a [Cloud Run](https://cloud.google.com/run/docs) application that renders a simple webpage.
 
+## YouTube Newsfeed
+
+Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firestore storage, optional ingestion via YouTube Data API (`POST /tasks/ingest`).
+
+### Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT` | Deploy | GCP project id (defaults to `summarizer-lab` if unset). |
+| `VERTEX_LOCATION` | No | Vertex AI region (default `europe-west1`). |
+| `GEMINI_MODEL` | No | Model id (default `gemini-2.5-flash`). |
+| `YOUTUBE_API_KEY` | Ingestion | YouTube Data API v3 key. |
+| `YOUTUBE_CHANNEL_IDS` | Ingestion | Comma-separated channel ids. |
+| `INGEST_SECRET` | Recommended | If set, ingest requires header `X-Ingest-Secret`. |
+| `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
+| `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `25`). |
+| `PORT` | No | Listen port (default `8080`). |
+
+### Firestore
+
+Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title`, `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. Feed shows items published in the last 7 days; older items appear under `/archive`.
+
+### Local run
+
+```bash
+cd youtube-summarizer-1
+pip install -r requirements.txt
+export GOOGLE_CLOUD_PROJECT=your-project
+gcloud auth application-default login
+python app.py
+```
+
+### Manual ingest
+
+```bash
+curl -sS -X POST "http://localhost:8080/tasks/ingest" -H "X-Ingest-Secret: $INGEST_SECRET"
+```
+
+Omit the header if `INGEST_SECRET` is unset (prototype only).
+
+### Cloud Run IAM
+
+Service account needs **Vertex AI User** and Firestore via **Cloud Datastore User** (or broader Firestore roles as needed).
+
 For details on how to use this sample as a template in Cloud Code, read the documentation for Cloud Code for [VS Code](https://cloud.google.com/code/docs/vscode/quickstart-cloud-run?utm_source=ext&utm_medium=partner&utm_campaign=CDR_kri_gcp_cloudcodereadmes_012521&utm_content=-) or [IntelliJ](https://cloud.google.com/code/docs/intellij/quickstart-cloud-run?utm_source=ext&utm_medium=partner&utm_campaign=CDR_kri_gcp_cloudcodereadmes_012521&utm_content=-).
 
 ### Table of Contents

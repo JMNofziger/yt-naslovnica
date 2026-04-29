@@ -1,0 +1,24 @@
+<article class="card-row">
+  <div class="vote-col">
+    <form class="vote-form" method="post" action="{{ url_for('vote') }}">
+      <input type="hidden" name="video_id" value="{{ item.id }}">
+      <input type="hidden" name="direction" value="up">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <button type="submit" class="vote-btn vote-up" aria-label="Upvote" title="Upvote">▲</button>
+    </form>
+    <div class="vote-score" title="score">{{ item.score }}</div>
+    <form class="vote-form" method="post" action="{{ url_for('vote') }}">
+      <input type="hidden" name="video_id" value="{{ item.id }}">
+      <input type="hidden" name="direction" value="down">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <button type="submit" class="vote-btn vote-down" aria-label="Downvote" title="Downvote">▼</button>
+    </form>
+  </div>
+  <div class="card-body">
+    <h2 class="card-title">
+      <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+    </h2>
+    <div class="card-meta">{{ item.channel }} · {{ item.published_label }}</div>
+    <p class="card-summary">{{ item.summary }}</p>
+  </div>
+</article>
