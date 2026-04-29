@@ -14,7 +14,7 @@ Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firesto
 | `VERTEX_LOCATION` | No | Vertex AI region (default `europe-west1`). |
 | `GEMINI_MODEL` | No | Model id (default `gemini-2.5-flash`). |
 | `YOUTUBE_API_KEY` | Ingestion | YouTube Data API v3 key. |
-| `YOUTUBE_CHANNEL_IDS` | Ingestion | Comma-separated channel ids. |
+| `YOUTUBE_CHANNEL_IDS` | Ingestion override | Comma-separated channel **ids** (`UC…`) and/or **URLs** with `/@handle/` (or bare handles). **If unset**, built-in Croatia/expat placeholder channels are used (see `DEFAULT_CHANNEL_SOURCES` in `app.py`). |
 | `INGEST_SECRET` | Recommended | If set, ingest requires header `X-Ingest-Secret`. |
 | `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
 | `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `25`). |

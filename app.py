@@ -1,6 +1,8 @@
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
+
 import requests
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from google import genai
@@ -26,6 +28,20 @@ FEED_DAYS = 7
 MAX_VIDEOS_PER_RUN = int(os.environ.get("MAX_VIDEOS_PER_RUN", "25"))
 INGEST_LOOKBACK_DAYS = int(os.environ.get("INGEST_LOOKBACK_DAYS", "30"))
 
+# Used when YOUTUBE_CHANNEL_IDS is unset: @handle URLs resolved via Data API (forHandle).
+DEFAULT_CHANNEL_SOURCES = (
+    "https://www.youtube.com/@PaulBradbury/videos",
+    "https://www.youtube.com/@livingincroatia/videos",
+    "https://www.youtube.com/@expatlifeincroatia/videos",
+    "https://www.youtube.com/@Hrvatskaradiotelevizija_HRT/videos",
+    "https://www.youtube.com/@TotalCroatiaNews/videos",
+)
+
+_CHANNEL_ID_UC = re.compile(r"^UC[a-zA-Z0-9_-]{22}$")
+_HANDLE_IN_URL = re.compile(
+    r"(?:https?://)?(?:www\.)?youtube\.com/@([^/?#]+)", re.I
+)
+
 _fs_client = None
 
 
@@ -49,6 +65,60 @@ client = genai.Client(
 
 def youtube_watch_url(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
+
+
+def channel_sources_from_env_or_defaults() -> list[str]:
+    raw = os.environ.get("YOUTUBE_CHANNEL_IDS", "").strip()
+    if raw:
+        return [c.strip() for c in raw.split(",") if c.strip()]
+    return list(DEFAULT_CHANNEL_SOURCES)
+
+
+def youtube_channel_id_for_handle(api_key: str, handle: str) -> str | None:
+    """Resolve @handle via channels.list(forHandle)."""
+    url = "https://www.googleapis.com/youtube/v3/channels"
+    params = {"part": "id", "forHandle": handle.strip(), "key": api_key}
+    r = requests.get(url, params=params, timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    items = data.get("items") or []
+    if not items:
+        logger.warning("No channel returned for forHandle=%s", handle)
+        return None
+    return items[0]["id"]
+
+
+def youtube_channel_id_from_reference(api_key: str, reference: str) -> str | None:
+    """
+    Accepts a channel id (UC…), a URL containing /@handle/, or a bare @handle/handle string.
+    """
+    reference = reference.strip()
+    if not reference:
+        return None
+    if _CHANNEL_ID_UC.match(reference):
+        return reference
+    m = _HANDLE_IN_URL.search(reference)
+    handle = None
+    if m:
+        handle = m.group(1)
+    elif reference.startswith("@"):
+        handle = reference[1:].strip()
+    elif "youtube.com" not in reference and "/" not in reference:
+        handle = reference.lstrip("@").strip()
+    if not handle:
+        logger.warning("Unrecognized channel reference: %s", reference)
+        return None
+    return youtube_channel_id_for_handle(api_key, handle)
+
+
+def _unique_channel_ids(ids: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for x in ids:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
 
 
 def generate_summary(youtube_link: str, extra: str = " ") -> str:
@@ -253,24 +323,48 @@ def tasks_ingest():
         abort(403)
 
     api_key = os.environ.get("YOUTUBE_API_KEY")
-    raw_channels = os.environ.get("YOUTUBE_CHANNEL_IDS", "")
-    channel_ids = [c.strip() for c in raw_channels.split(",") if c.strip()]
+    channel_refs = channel_sources_from_env_or_defaults()
 
-    if not api_key or not channel_ids:
+    if not api_key or not channel_refs:
         return jsonify(
             {
                 "ok": True,
                 "skipped": True,
-                "message": "Set YOUTUBE_API_KEY and YOUTUBE_CHANNEL_IDS to enable ingestion.",
+                "message": "Set YOUTUBE_API_KEY to enable ingestion (channel URLs/ids come from "
+                "YOUTUBE_CHANNEL_IDS or built-in placeholders).",
                 "processed": 0,
             }
+        )
+
+    resolved_ids: list[str] = []
+    resolve_warnings: list[dict[str, str]] = []
+    for ref in channel_refs:
+        cid = youtube_channel_id_from_reference(api_key, ref)
+        if cid:
+            resolved_ids.append(cid)
+        else:
+            resolve_warnings.append({"ref": ref, "error": "could not resolve channel id"})
+
+    resolved_ids = _unique_channel_ids(resolved_ids)
+
+    if not resolved_ids:
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "No channel IDs resolved; check refs and API key quotas.",
+                    "resolve_warnings": resolve_warnings,
+                    "processed": 0,
+                }
+            ),
+            422,
         )
 
     lookback = utcnow() - timedelta(days=INGEST_LOOKBACK_DAYS)
     published_after_iso = lookback.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     candidates = []
-    for cid in channel_ids:
+    for cid in resolved_ids:
         try:
             batch = youtube_search_channel(api_key, cid, published_after_iso)
             candidates.extend(batch)
@@ -325,6 +419,8 @@ def tasks_ingest():
             "ok": True,
             "processed": processed,
             "candidates": len(candidates),
+            "channels_resolved": len(resolved_ids),
+            "resolve_warnings": resolve_warnings,
             "errors": errors[:10],
         }
     )
