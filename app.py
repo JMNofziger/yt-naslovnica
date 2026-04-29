@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import threading
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -316,24 +317,31 @@ def youtube_search_channel(api_key: str, channel_id: str, published_after_iso: s
     return videos
 
 
-@app.post("/tasks/ingest")
-def tasks_ingest():
-    secret = os.environ.get("INGEST_SECRET")
-    if secret and request.headers.get("X-Ingest-Secret") != secret:
-        abort(403)
+def feed_has_any_items() -> bool:
+    """True if at least one feed_items document exists."""
+    db = get_fs()
+    snap = next(db.collection(COLLECTION).limit(1).stream(), None)
+    return snap is not None
 
+
+def perform_ingestion() -> tuple[dict, int]:
+    """
+    Run one ingestion pass (resolve channels, search, summarize new videos).
+    Returns (payload dict, HTTP status code).
+    """
     api_key = os.environ.get("YOUTUBE_API_KEY")
     channel_refs = channel_sources_from_env_or_defaults()
 
     if not api_key or not channel_refs:
-        return jsonify(
+        return (
             {
                 "ok": True,
                 "skipped": True,
                 "message": "Set YOUTUBE_API_KEY to enable ingestion (channel URLs/ids come from "
                 "YOUTUBE_CHANNEL_IDS or built-in placeholders).",
                 "processed": 0,
-            }
+            },
+            200,
         )
 
     resolved_ids: list[str] = []
@@ -349,14 +357,12 @@ def tasks_ingest():
 
     if not resolved_ids:
         return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": "No channel IDs resolved; check refs and API key quotas.",
-                    "resolve_warnings": resolve_warnings,
-                    "processed": 0,
-                }
-            ),
+            {
+                "ok": False,
+                "error": "No channel IDs resolved; check refs and API key quotas.",
+                "resolve_warnings": resolve_warnings,
+                "processed": 0,
+            },
             422,
         )
 
@@ -370,7 +376,7 @@ def tasks_ingest():
             candidates.extend(batch)
         except Exception as e:
             logger.exception("youtube search failed for channel %s", cid)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return ({"ok": False, "error": str(e)}, 500)
 
     # Dedupe by video id across channels
     _by_vid = {}
@@ -414,7 +420,7 @@ def tasks_ingest():
         )
         processed += 1
 
-    return jsonify(
+    return (
         {
             "ok": True,
             "processed": processed,
@@ -422,8 +428,65 @@ def tasks_ingest():
             "channels_resolved": len(resolved_ids),
             "resolve_warnings": resolve_warnings,
             "errors": errors[:10],
-        }
+        },
+        200,
     )
+
+
+def schedule_initial_ingest_if_configured() -> None:
+    """
+    INITIAL_INGEST_ON_STARTUP: background ingest once when the process starts (Dockerfile uses python app.py).
+    By default runs only if feed_items has no documents yet.
+    FORCE_INGEST_ON_STARTUP: also run when feed already has items (still skips videos already in Firestore).
+    """
+    boot = os.environ.get("INITIAL_INGEST_ON_STARTUP", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    force = os.environ.get("FORCE_INGEST_ON_STARTUP", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if not boot and not force:
+        return
+
+    def runner() -> None:
+        try:
+            if feed_has_any_items() and not force:
+                logger.info(
+                    "INITIAL_INGEST_ON_STARTUP: skip — feed_items already has documents "
+                    "(set FORCE_INGEST_ON_STARTUP=true to run anyway)."
+                )
+                return
+            if not os.environ.get("YOUTUBE_API_KEY"):
+                logger.warning(
+                    "INITIAL_INGEST_ON_STARTUP set but YOUTUBE_API_KEY missing; skipping bootstrap."
+                )
+                return
+            payload, code = perform_ingestion()
+            logger.info(
+                "INITIAL_INGEST_ON_STARTUP finished: http_status=%s payload=%s",
+                code,
+                payload,
+            )
+        except Exception:
+            logger.exception("INITIAL_INGEST_ON_STARTUP failed")
+
+    threading.Thread(target=runner, daemon=True).start()
+
+
+@app.post("/tasks/ingest")
+def tasks_ingest():
+    secret = os.environ.get("INGEST_SECRET")
+    if secret and request.headers.get("X-Ingest-Secret") != secret:
+        abort(403)
+
+    payload, status = perform_ingestion()
+    return jsonify(payload), status
 
 
 @app.route("/summarize", methods=["GET", "POST"])
@@ -440,5 +503,6 @@ def summarize():
 
 
 if __name__ == "__main__":
+    schedule_initial_ingest_if_configured()
     server_port = os.environ.get("PORT", "8080")
     app.run(debug=False, port=int(server_port), host="0.0.0.0")

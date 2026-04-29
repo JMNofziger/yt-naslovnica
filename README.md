@@ -18,6 +18,8 @@ Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firesto
 | `INGEST_SECRET` | Recommended | If set, ingest requires header `X-Ingest-Secret`. |
 | `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
 | `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `25`). |
+| `INITIAL_INGEST_ON_STARTUP` | No | If `true`, run one ingest in the background when the container starts **only if `feed_items` is empty** (first deploy). Requires `python app.py` as entrypoint (not all process managers). |
+| `FORCE_INGEST_ON_STARTUP` | No | If `true`, run startup ingest even when the feed already has items (still skips videos already stored). Often used with `INITIAL_INGEST_ON_STARTUP=true`. |
 | `PORT` | No | Listen port (default `8080`). |
 
 ### Firestore
@@ -34,13 +36,22 @@ gcloud auth application-default login
 python app.py
 ```
 
-### Manual ingest
+### Manual ingest (force a run now)
+
+From your laptop or Cloud Shell against the deployed or local URL:
 
 ```bash
-curl -sS -X POST "http://localhost:8080/tasks/ingest" -H "X-Ingest-Secret: $INGEST_SECRET"
+curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
+  -H "X-Ingest-Secret: $INGEST_SECRET"
 ```
 
-Omit the header if `INGEST_SECRET` is unset (prototype only).
+Use `-v` to confirm HTTP status. Omit `X-Ingest-Secret` if `INGEST_SECRET` is unset (prototype only).
+
+### Automatic first-time ingest on deploy
+
+Set Cloud Run env vars (example):
+
+`INITIAL_INGEST_ON_STARTUP=true` and `YOUTUBE_API_KEY=...` so the first revision with an empty Firestore collection pulls placeholder channels without a manual `curl`. To always run an ingest pass on every cold start (heavier), also set `FORCE_INGEST_ON_STARTUP=true`.
 
 ### Cloud Run IAM
 
