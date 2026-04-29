@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+ <head>
+   <title>YouTube Summarizer</title>
+   <style>
+     body {
+       font-family: sans-serif;
+       display: flex;
+       justify-content: center;
+       align-items: center;
+       min-height: 100vh;
+       background-color: #f4f4f4;
+     }
+     .container {
+       background-color: white;
+       padding: 30px;
+       border-radius: 8px;
+       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+       text-align: center;
+     }
+     h2 {
+       text-align: center;
+       margin-bottom: 20px;
+     }
+     input[type="text"], textarea, select {
+       width: 100%;
+       padding: 10px;
+       margin-bottom: 15px;
+       border: 1px solid #ccc;
+       border-radius: 4px;
+       box-sizing: border-box;
+     }
+     button {
+       background-color: #4CAF50;
+       color: white;
+       padding: 12px 20px;
+       border: none;
+       border-radius: 4px;
+       cursor: pointer;
+     }
+   </style>
+ </head>
+ <body>
+   <div class="container">
+     <h2>YouTube Summarizer</h2>
+     <form action="/summarize" target="_blank" method="post">
+       <input type="text" name="youtube_link" placeholder="Enter YouTube Link">
+       <select name="model">
+         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+       </select>
+       <textarea name="additional_prompt" placeholder="Write your additional prompt here. For example: 'explain to me like I am five years old'"></textarea>
+       <button type="submit">Summarize</button>
+     </form>
+   </div>
+ </body>
+</html>
