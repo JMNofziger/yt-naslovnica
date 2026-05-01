@@ -15,9 +15,15 @@
     </form>
   </div>
   <div class="card-body">
-    <h2 class="card-title">
-      <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
-    </h2>
+    <div class="card-title-row">
+      <h2 class="card-title">
+        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+      </h2>
+      <span class="lang-pill lang-flag-{{ item.language_flag_class }} notranslate" translate="no" role="group" aria-label="Language: {{ item.language_abbr }}">
+        <span class="lang-pill-label">Language</span>
+        <span class="lang-pill-code">{{ item.language_abbr }}</span>
+      </span>
+    </div>
     <div class="card-meta">{{ item.channel }} · {{ item.published_label }}</div>
     <p class="card-summary">{{ item.summary }}</p>
   </div>

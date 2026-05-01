@@ -79,7 +79,7 @@ Create a **YouTube Data API key** under APIs & Services → Credentials (Console
 | `GEMINI_MODEL` | No | Model id (default `gemini-2.5-flash`). |
 | `YOUTUBE_API_KEY` | Ingestion | YouTube Data API v3 key. |
 | `YOUTUBE_CHANNEL_IDS` | Ingestion override | Comma-separated channel **ids** (`UC…`) and/or **URLs** with `/@handle/` (or bare handles). **If unset**, built-in Croatia/expat placeholder channels are used (see `DEFAULT_CHANNEL_SOURCES` in `app.py`). |
-| `INGEST_SECRET` | Recommended | If set, ingest requires header `X-Ingest-Secret`. |
+| `INGEST_SECRET` | **Required for `/tasks/ingest`** | Shared secret. HTTP ingest returns **503** if unset. Callers must send **`X-Ingest-Secret: <value>`** or **`Authorization: Bearer <value>`** (Cloud Scheduler / curl / GitHub Actions can all set custom headers). **`INITIAL_INGEST_ON_STARTUP`** still calls `perform_ingestion()` in-process and does not hit this route. |
 | `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
 | `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `20`). |
 | `INITIAL_INGEST_ON_STARTUP` | No | If `true`, run one ingest in the background when the container starts **only if `feed_items` is empty** (first deploy). Requires `python app.py` as entrypoint (not all process managers). |
@@ -103,20 +103,36 @@ python app.py
 
 ### Manual ingest (force a run now)
 
-From your laptop or Cloud Shell against the deployed or local URL:
+**`INGEST_SECRET` must be set** on the Cloud Run service (and locally if you hit `/tasks/ingest`). Authenticate with either header:
 
 ```bash
+export SERVICE_URL="https://hackathon-818144832337.europe-west1.run.app"
+export INGEST_SECRET="your-secret"   # match Cloud Run env
+
 curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
-  -H "X-Ingest-Secret: $INGEST_SECRET"
+  -H "X-Ingest-Secret: ${INGEST_SECRET}"
+# or:
+curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
+  -H "Authorization: Bearer ${INGEST_SECRET}"
 ```
 
-Use `-v` to confirm HTTP status. Omit `X-Ingest-Secret` if `INGEST_SECRET` is unset (prototype only).
+Use `-v` to confirm HTTP status. **`403`** means wrong/missing secret; **`503`** with a JSON error means `INGEST_SECRET` is not configured on the server.
 
-Target **`hackathon`** (your Cloud Run URL), e.g.:
+### Cloud Scheduler (automation)
+
+Create or edit the job so the HTTP target includes the same secret header Cloud Run expects, for example:
 
 ```bash
-curl -sS -X POST "https://hackathon-818144832337.europe-west1.run.app/tasks/ingest"
+gcloud scheduler jobs create http youtube-newsfeed-ingest \
+  --project=summarizer-lab \
+  --location=europe-west1 \
+  --schedule="0 6 * * *" \
+  --uri="${SERVICE_URL}/tasks/ingest" \
+  --http-method=POST \
+  --headers="User-Agent=Google-Cloud-Scheduler,X-Ingest-Secret=${INGEST_SECRET}"
 ```
+
+(Use **Secret Manager** + substitution for production rather than inline plaintext in shell history.)
 
 ### Optional: placeholder rows without ingestion
 

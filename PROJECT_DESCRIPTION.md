@@ -23,7 +23,7 @@ Keeping up with several channels means opening YouTube and losing an hour. This 
 | **Votes** | Visitors can **upvote or downvote** items without logging in; counts are stored **on the item document** (simple counters). |
 | **Sources** | Ingestion pulls from a **configurable list** of channels. By default, if you don’t override env vars, it uses a **placeholder set** aimed at **Croatia / expat-in-Croatia** plus major Croatian news/TV handles (see below). |
 | **UI translation** | Header includes Google’s **Website Translator** widget so visitors can translate page text in-browser (third-party script). |
-| **Ingestion** | On a schedule **you** define (e.g. daily cron or Cloud Scheduler), hit **`POST /tasks/ingest`** to fetch recent uploads from YouTube’s API, skip videos already in Firestore, and summarize new ones up to a **per-run cap** to control cost. Optional **startup bootstrap** can run a first ingest when the database is still empty. |
+| **Ingestion** | On a schedule **you** define (e.g. daily Cloud Scheduler), **`POST /tasks/ingest`** with **`INGEST_SECRET`** (`X-Ingest-Secret` or **`Authorization: Bearer`**). Startup **`INITIAL_INGEST_ON_STARTUP`** runs **`perform_ingestion`** in-process (same caps; does not use HTTP). |
 
 ---
 

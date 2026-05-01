@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -197,6 +198,99 @@ def generate_summary(youtube_link: str, extra: str = " ") -> str:
     ).text
 
 
+def _parse_summary_language_blob(raw: str | None) -> tuple[str, str]:
+    """Parse Gemini JSON {\"summary\",\"primary_language\"}; returns (summary, iso639-1 or '')."""
+    if not raw:
+        return "", ""
+    text = raw.strip()
+    for fence in ("```json", "```JSON", "```"):
+        if fence in text:
+            try:
+                text = text.split(fence, 1)[1]
+                text = text.split("```", 1)[0].strip()
+            except IndexError:
+                pass
+            break
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            summary = (data.get("summary") or "").strip()
+            lang = data.get("primary_language") or data.get("language") or ""
+            if isinstance(lang, str):
+                lang = normalize_spoken_language_code(lang)
+            else:
+                lang = ""
+            return summary, lang
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    return "", ""
+
+
+def normalize_spoken_language_code(raw: str | None) -> str:
+    s = (raw or "").strip().lower()
+    if len(s) >= 2 and s[:2].isalpha():
+        return s[:2]
+    return ""
+
+
+# ISO 639-1 codes with a dedicated flag-inspired gradient in static/style.css.
+LANGUAGE_FLAG_STYLE_CODES = frozenset(
+    {"en", "hr", "sr", "bs", "sl", "de", "it", "fr", "es", "pl", "uk", "nl", "sq", "mk"}
+)
+
+
+def spoken_language_ui(code: str) -> dict[str, str]:
+    c = normalize_spoken_language_code(code)
+    if not c:
+        return {"language_abbr": "—", "language_flag_class": "unknown"}
+    flag_class = c if c in LANGUAGE_FLAG_STYLE_CODES else "generic"
+    return {"language_abbr": c.upper(), "language_flag_class": flag_class}
+
+
+def ingest_request_authorized(expected_secret: str) -> bool:
+    if request.headers.get("X-Ingest-Secret", "").strip() == expected_secret:
+        return True
+    auth = request.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip() == expected_secret
+    return False
+
+
+def generate_summary_and_spoken_language(youtube_link: str, extra: str = " ") -> tuple[str, str]:
+    youtube_video = types.Part.from_uri(file_uri=youtube_link, mime_type="video/*")
+    if not extra.strip():
+        extra = " "
+    instructions = (
+        "Listen to the spoken audio and respond with VALID JSON ONLY (no markdown, no prose outside JSON).\n"
+        'Schema: {"summary": "<concise plain-text summary of topics discussed>", '
+        '"primary_language": "<ISO 639-1 two-letter lowercase code for the main spoken language, e.g. en, hr>"}\n'
+        "Rules: summary is one or two short paragraphs of plain text. primary_language must be exactly two letters."
+    )
+    contents = [
+        youtube_video,
+        types.Part.from_text(text=instructions),
+        extra,
+    ]
+    cfg = types.GenerateContentConfig(
+        temperature=0.8,
+        top_p=0.95,
+        max_output_tokens=8192,
+        response_modalities=["TEXT"],
+    )
+    blob = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=contents,
+        config=cfg,
+    ).text
+    summary, lang = _parse_summary_language_blob(blob)
+    if not summary.strip():
+        logger.warning(
+            "summary+language JSON parse failed or empty summary; retrying summary-only fallback"
+        )
+        summary = generate_summary(youtube_link, extra).strip()
+    return summary, lang
+
+
 def sanitize_plain_card_title(raw: str | None, max_len: int = 160) -> str:
     """Strip hashtags / noisy spacing for safe card display."""
     s = (raw or "").strip()
@@ -312,6 +406,8 @@ def load_items_for_feed(*, active: bool):
         stored = d.get("title")
         raw_yt = d.get("title_raw")
         card_title = sanitize_plain_card_title(stored or raw_yt or "(untitled)")
+        lang_code = normalize_spoken_language_code(d.get("primary_language"))
+        lang_ui = spoken_language_ui(lang_code)
         items.append(
             {
                 "id": pid,
@@ -324,8 +420,11 @@ def load_items_for_feed(*, active: bool):
                 "upvotes": up,
                 "downvotes": down,
                 "score": up - down,
+                "language_abbr": lang_ui["language_abbr"],
+                "language_flag_class": lang_ui["language_flag_class"],
             }
         )
+    items.sort(key=lambda row: (-int(row["upvotes"]), -(row["published_at"].timestamp())))
     return items
 
 
@@ -527,7 +626,7 @@ def perform_ingestion() -> tuple[dict, int]:
         raw_title = row.get("title") or ""
         card_headline = concise_english_card_title(raw_title)
         try:
-            summary = generate_summary(watch, " ")
+            summary, spoken_lang = generate_summary_and_spoken_language(watch, " ")
         except Exception as e:
             logger.exception("gemini failed for %s", vid)
             errors.append({"video_id": vid, "error": str(e)})
@@ -536,18 +635,19 @@ def perform_ingestion() -> tuple[dict, int]:
             pub_dt = parse_youtube_published_at(row["published_at"])
         except Exception:
             pub_dt = utcnow()
-        ref.set(
-            {
-                "title_raw": raw_title,
-                "title": card_headline,
-                "url": watch,
-                "channel": row["channel_title"],
-                "published_at": pub_dt,
-                "summary": summary,
-                "upvotes": 0,
-                "downvotes": 0,
-            }
-        )
+        doc = {
+            "title_raw": raw_title,
+            "title": card_headline,
+            "url": watch,
+            "channel": row["channel_title"],
+            "published_at": pub_dt,
+            "summary": summary,
+            "upvotes": 0,
+            "downvotes": 0,
+        }
+        if spoken_lang:
+            doc["primary_language"] = spoken_lang
+        ref.set(doc)
         processed += 1
 
     return (
@@ -611,9 +711,21 @@ def schedule_initial_ingest_if_configured() -> None:
 
 @app.post("/tasks/ingest")
 def tasks_ingest():
-    secret = os.environ.get("INGEST_SECRET")
-    if secret and request.headers.get("X-Ingest-Secret") != secret:
-        abort(403)
+    secret = (os.environ.get("INGEST_SECRET") or "").strip()
+    if not secret:
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "INGEST_SECRET must be set on the service to enable HTTP ingest. "
+                    "Send the same value in header X-Ingest-Secret or Authorization: Bearer <secret>. "
+                    "In-process startup ingest (INITIAL_INGEST_ON_STARTUP) does not use this route.",
+                }
+            ),
+            503,
+        )
+    if not ingest_request_authorized(secret):
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
 
     payload, status = perform_ingestion()
     return jsonify(payload), status
