@@ -233,18 +233,57 @@ def normalize_spoken_language_code(raw: str | None) -> str:
     return ""
 
 
-# ISO 639-1 codes with a dedicated flag-inspired gradient in static/style.css.
-LANGUAGE_FLAG_STYLE_CODES = frozenset(
-    {"en", "hr", "sr", "bs", "sl", "de", "it", "fr", "es", "pl", "uk", "nl", "sq", "mk"}
-)
+def _regional_flag_emoji(alpha2_country: str) -> str:
+    """Build a Unicode regional-flag pair from ISO 3166-1 alpha-2 (e.g. HR → 🇭🇷)."""
+    a = (alpha2_country or "").strip().upper()
+    if len(a) != 2 or not (a.isalpha() and a.isascii()):
+        return ""
+    return chr(ord(a[0]) - ord("A") + 0x1F1E6) + chr(ord(a[1]) - ord("A") + 0x1F1E6)
+
+
+# ISO 639-1 → representative territory for flag emoji (languages ≠ countries; heuristic).
+_LANGUAGE_TO_TERRITORY = {
+    "en": "US",
+    "hr": "HR",
+    "sr": "RS",
+    "bs": "BA",
+    "sl": "SI",
+    "de": "DE",
+    "it": "IT",
+    "fr": "FR",
+    "es": "ES",
+    "pl": "PL",
+    "uk": "UA",
+    "nl": "NL",
+    "sq": "AL",
+    "mk": "MK",
+    "hu": "HU",
+    "ro": "RO",
+    "cs": "CZ",
+    "sk": "SK",
+    "bg": "BG",
+    "el": "GR",
+    "tr": "TR",
+    "pt": "PT",
+    "ru": "RU",
+    "sv": "SE",
+    "da": "DK",
+    "fi": "FI",
+    "no": "NO",
+    "nb": "NO",
+    "nn": "NO",
+}
 
 
 def spoken_language_ui(code: str) -> dict[str, str]:
     c = normalize_spoken_language_code(code)
     if not c:
-        return {"language_abbr": "—", "language_flag_class": "unknown"}
-    flag_class = c if c in LANGUAGE_FLAG_STYLE_CODES else "generic"
-    return {"language_abbr": c.upper(), "language_flag_class": flag_class}
+        return {"language_abbr": "—", "language_flag_emoji": "🌐"}
+    territory = _LANGUAGE_TO_TERRITORY.get(c)
+    emoji = _regional_flag_emoji(territory) if territory else ""
+    if not emoji:
+        emoji = "🌐"
+    return {"language_abbr": c.upper(), "language_flag_emoji": emoji}
 
 
 def ingest_request_authorized(expected_secret: str) -> bool:
@@ -421,7 +460,7 @@ def load_items_for_feed(*, active: bool):
                 "downvotes": down,
                 "score": up - down,
                 "language_abbr": lang_ui["language_abbr"],
-                "language_flag_class": lang_ui["language_flag_class"],
+                "language_flag_emoji": lang_ui["language_flag_emoji"],
             }
         )
     items.sort(key=lambda row: (-int(row["upvotes"]), -(row["published_at"].timestamp())))
