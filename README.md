@@ -1,226 +1,102 @@
-# Cloud Run Hello World with Cloud Code
+# YT Naslovnica
 
-"Hello World" is a [Cloud Run](https://cloud.google.com/run/docs) application that renders a simple webpage.
+An **aggregated front page of hand-picked YouTube sources** focused on **Croatia and Zagreb** — national and regional news, broadcasters, tourism, expat life, and related channels. A scheduler triggers **automatic ingestion** of recent uploads; each item gets a **short English headline and summary** (Vertex Gemini). Visitors **vote up or down**; **ordering favors higher scores** so favorites surface above newer-but-weaker posts (within the active feed window).
 
-## YouTube Newsfeed
+The UI brand in-app is **“Youtube Naslovnica”** / compact **“YT Naslovnica”** on small screens.
 
-Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firestore storage, optional ingestion via YouTube Data API (`POST /tasks/ingest`).
+**Reference deployment:** Cloud Run service **`hackathon`**, GCP project **`summarizer-lab`**, region **`europe-west1`** (URL shape: `https://hackathon-<PROJECT_NUMBER>.europe-west1.run.app`).
 
-**Canonical Cloud Run service:** deploy this repo to **`hackathon`** (`summarizer-lab`, `europe-west1`). Example URL shape: `https://hackathon-<PROJECT_NUMBER>.europe-west1.run.app`. The legacy **`youtube-summarizer`** Cloud Run service has been removed from this project.
+## Stack
 
-### Required before anything works: Firestore
+Python **Flask**, **Firestore**, **Vertex AI (Gemini)**, **YouTube Data API v3**, **Docker** → Cloud Run.
 
-The app reads/writes collection **`feed_items`** in **Cloud Firestore (Native mode)** in the **same GCP project** as Cloud Run (`GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT`).
-
-If you see **`404 The database (default) does not exist`**, the database was never created for that project:
-
-1. Open **[Firestore / Datastore setup](https://console.cloud.google.com/firestore)** (pick project **`summarizer-lab`** or whichever project your service uses).
-2. **Create database** → choose **Native mode** → region → finish provisioning.
-3. Ensure Cloud Run’s **`GOOGLE_CLOUD_PROJECT`** matches that project (otherwise you enabled Firestore in the wrong place).
-
-Until Firestore exists, the feed, archive, votes, and ingestion cannot persist data.
-
-### Page translation (visitors)
-
-The layout loads Google’s **Website Translator** widget (third‑party script from `translate.google.com`). Visitors can choose a language from the header dropdown to translate visible page text in the browser. This is a lightweight MVP; it is **not** a substitute for professional localization or GDPR/consent review if you need those later.
-
-### Provision with gcloud (script)
-
-From `youtube-summarizer-1`:
-
-```bash
-export GOOGLE_CLOUD_PROJECT=summarizer-lab   # or your real project id
-chmod +x scripts/setup_gcp_infrastructure.sh
-./scripts/setup_gcp_infrastructure.sh        # or: ./scripts/setup_gcp_infrastructure.sh YOUR_PROJECT_ID
-```
-
-Optional: `FIRESTORE_LOCATION=europe-west3 ./scripts/setup_gcp_infrastructure.sh` if you want another [Firestore region](https://cloud.google.com/firestore/docs/locations).
-
-### Provision manually (same steps)
-
-Use non-interactive defaults so **`gcloud`** never blocks on **`Would you like to enable and retry (y/N)?`** (common when Cloud Scheduler API is off):
+## Operator quick path
 
 ```bash
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+export GOOGLE_CLOUD_PROJECT=summarizer-lab   # or yours
+
+cd youtube-summarizer-1   # repository root (see rename note below)
+pip install -r requirements.txt
+
+chmod +x scripts/setup_gcp_infrastructure.sh
+./scripts/setup_gcp_infrastructure.sh "$GOOGLE_CLOUD_PROJECT"
 ```
 
-```bash
-PROJECT_ID=summarizer-lab   # change me
-REGION=europe-west1         # Firestore location; aligns with default Vertex region in app.py
+Create a **YouTube Data API key** (Console → APIs & Services → Credentials). Set **`YOUTUBE_API_KEY`** on Cloud Run.
 
-gcloud services enable \
-  --project="$PROJECT_ID" \
-  --quiet \
-  firestore.googleapis.com \
-  aiplatform.googleapis.com \
-  youtube.googleapis.com \
-  run.googleapis.com \
-  artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com \
-  iam.googleapis.com \
-  secretmanager.googleapis.com \
-  cloudscheduler.googleapis.com
-
-gcloud firestore databases create --project="$PROJECT_ID" --location="$REGION"
-
-PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
-RUNTIME_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${RUNTIME_SA}" \
-  --role="roles/datastore.user" \
-  --quiet
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${RUNTIME_SA}" \
-  --role="roles/aiplatform.user" \
-  --quiet
-```
-
-Create a **YouTube Data API key** under APIs & Services → Credentials (Console). Set Cloud Run env vars (`YOUTUBE_API_KEY`, etc.) per below.
-
-### Environment variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT` | Deploy | GCP project id (defaults to `summarizer-lab` if unset). |
-| `VERTEX_LOCATION` | No | Vertex AI region (default `europe-west1`). |
-| `GEMINI_MODEL` | No | Model id (default `gemini-2.5-flash`). |
-| `YOUTUBE_API_KEY` | Ingestion | YouTube Data API v3 key. |
-| `YOUTUBE_CHANNEL_IDS` | Ingestion override | Comma-separated channel **ids** (`UC…`) and/or **URLs** with `/@handle/` (or bare handles). **If unset**, built-in Croatia/expat placeholder channels are used (see `DEFAULT_CHANNEL_SOURCES` in `app.py`). |
-| `INGEST_SECRET` | **Required for `/tasks/ingest`** | Shared secret; **503** if unset on the service. Callers use **`X-Ingest-Secret`** or **`Bearer`**. **Prod:** mount **`INGEST_SECRET=hackathon-ingest-secret:latest`** (Secret Manager). **`INITIAL_INGEST_ON_STARTUP`** still runs `perform_ingestion()` in-process and skips this route. |
-| `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
-| `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `20`). |
-| `INITIAL_INGEST_ON_STARTUP` | No | If `true`, run one ingest in the background when the container starts **only if `feed_items` is empty** (first deploy). Requires `python app.py` as entrypoint (not all process managers). |
-| `FORCE_INGEST_ON_STARTUP` | No | If `true`, run startup ingest even when the feed already has items (still skips videos already stored). Often used with `INITIAL_INGEST_ON_STARTUP=true`. |
-| `FEED_DAYS` | No | Active feed window by video publish date (default `30`). Older docs show under `/archive`. |
-| `PORT` | No | Listen port (default `8080`). |
-
-### Firestore
-
-Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title_raw` (original YouTube title), **`title`** (concise English card headline from Gemini), `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. The **active feed** shows items whose **`published_at` is within the last `FEED_DAYS`** (default **30**, override with env `FEED_DAYS`); older items appear under `/archive`.
-
-### Production ingest secret (Secret Manager + Scheduler)
-
-On **`summarizer-lab`**, production uses Secret **`hackathon-ingest-secret`**. Cloud Run **`hackathon`** maps **`INGEST_SECRET`** from **`hackathon-ingest-secret:latest`** (runtime SA needs **`roles/secretmanager.secretAccessor`**). After rotating secret versions:
-
-```bash
-gcloud run services update hackathon \
-  --region=europe-west1 --project=summarizer-lab \
-  --update-secrets=INGEST_SECRET=hackathon-ingest-secret:latest
-```
-
-Cloud Scheduler stores HTTP headers on the job (it does not pull Secret Manager each run). Re-sync headers whenever the secret value changes:
+Secure ingest: **`INGEST_SECRET`** must be set for **`POST /tasks/ingest`**. Production mounts **`hackathon-ingest-secret`** from Secret Manager. After rotating that secret, refresh Scheduler headers:
 
 ```bash
 chmod +x scripts/sync_hackathon_ingest_scheduler.sh
-./scripts/sync_hackathon_ingest_scheduler.sh   # default job: hackathon-feed-ingest, 06:00 UTC daily
+./scripts/sync_hackathon_ingest_scheduler.sh
 ```
 
-*(The script sets **`CLOUDSDK_CORE_DISABLE_PROMPTS=1`**, pre-enables **Scheduler + Secret Manager** APIs with **`--quiet`**, and by default discards Scheduler **`gcloud`** stdout so secrets are not copied into shared logs. On your laptop you can run **`INGEST_SCHEDULER_VERBOSE=1 ./scripts/sync_hackathon_ingest_scheduler.sh`** to print the full job resource to stderr.)*
-
-### Local run
+**Deploy / redeploy** (preserves Secret-ref pattern):
 
 ```bash
-cd youtube-summarizer-1
+gcloud run deploy hackathon --source . --region europe-west1 --project summarizer-lab \
+  --timeout=900 \
+  --set-secrets=INGEST_SECRET=hackathon-ingest-secret:latest
+```
+
+**Manual ingest** (example):
+
+```bash
+SERVICE_URL="$(gcloud run services describe hackathon --region europe-west1 --project summarizer-lab --format='value(status.url)')"
+curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
+  -H "X-Ingest-Secret: $(gcloud secrets versions access latest --secret=hackathon-ingest-secret --project summarizer-lab)"
+```
+
+Use **`CLOUDSDK_CORE_DISABLE_PROMPTS=1`** in automation so **`gcloud`** never blocks on API-enable **`y/N`** prompts.
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT` | GCP project (default in code: `summarizer-lab`) |
+| `YOUTUBE_API_KEY` | Ingestion / channel resolution |
+| `INGEST_SECRET` | **`POST /tasks/ingest`** — **`503`** if unset on service |
+| `YOUTUBE_CHANNEL_IDS` | Optional comma-separated `UC…` and/or `/@handle/` URLs; else **`DEFAULT_CHANNEL_SOURCES`** in `app.py` |
+| `VERTEX_LOCATION`, `GEMINI_MODEL` | Vertex defaults `europe-west1`, `gemini-2.5-flash` |
+| `FEED_DAYS` | Published-after cutoff for main feed vs **`/archive`** (default **30**) |
+| `MAX_VIDEOS_PER_RUN`, `INGEST_LOOKBACK_DAYS` | Ingest caps / search window |
+
+Startup ingest flags (**`INITIAL_INGEST_ON_STARTUP`**, **`FORCE_INGEST_ON_STARTUP`**) are documented in **`app.py`**.
+
+Runtime SA needs Firestore (**Datastore User**), **Vertex AI User**, and **Secret Accessor** on the ingest secret if used.
+
+## Data model
+
+Firestore **`feed_items`**, document id = YouTube video id — **`title`**, **`title_raw`**, **`url`**, **`channel`**, **`published_at`**, **`summary`**, **`primary_language`**, **`upvotes`**, **`downvotes`**.
+
+## Local development
+
+```bash
 pip install -r requirements.txt
-export GOOGLE_CLOUD_PROJECT=your-project
+export GOOGLE_CLOUD_PROJECT=summarizer-lab
 gcloud auth application-default login
 python app.py
 ```
 
-### Manual ingest (force a run now)
+Optional empty-db demo rows: **`scripts/seed_placeholder_feed_items.py`**. One-off diversity backfill: **`scripts/oneoff_one_video_per_channel.py`**.
 
-**`INGEST_SECRET` must be set** on the Cloud Run service (and locally if you hit `/tasks/ingest`). Prefer fetching from Secret Manager instead of typing the value:
+## Renaming this repository to **`yt-naslovnica`**
 
-```bash
-SERVICE_URL="$(gcloud run services describe hackathon --region=europe-west1 --project=summarizer-lab --format='value(status.url)')"
-curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
-  -H "X-Ingest-Secret: $(gcloud secrets versions access latest --secret=hackathon-ingest-secret --project=summarizer-lab)"
-# or Bearer:
-curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
-  -H "Authorization: Bearer $(gcloud secrets versions access latest --secret=hackathon-ingest-secret --project=summarizer-lab)"
-```
+GitHub **rename first**, then update clients so nothing depends on the old URL long-term (GitHub redirects for a while, but triggers and bookmarks should move).
 
-For ad-hoc runs outside GCP, set **`INGEST_SECRET`** in your environment to match the value Cloud Run sees.
+1. **GitHub** → repo **Settings → General → Repository name** → **`yt-naslovnica`**.
+2. **Every clone:**
 
-**`403`** → wrong/missing header; **`503`** JSON → `INGEST_SECRET` not configured on the server.
+   ```bash
+   git remote set-url origin git@github.com:JMNofziger/yt-naslovnica.git
+   git fetch origin
+   ```
 
-### Cloud Scheduler (automation)
+   Replace **`JMNofziger`** with your org/user if different.
 
-Prefer **`scripts/sync_hackathon_ingest_scheduler.sh`** so headers stay aligned with **`hackathon-ingest-secret:latest`** without copying secrets into shell history. Scheduler job definitions still contain header values in the control plane—restrict IAM on **`cloudscheduler.jobs.get`** / **`run.job`** roles accordingly.
+3. **GCP Cloud Build** (or any CI): reconnect triggers / edit URLs if they pointed at the old repo path.
 
-### Optional: placeholder rows without ingestion
+4. **Cursor / IDE** “linked repo”: reopen from Git clone URL after **`git remote set-url`** if the IDE caches the old path.
 
-If `YOUTUBE_API_KEY` is not configured yet but you want non-empty UI for demos, run:
-
-```bash
-python3 scripts/seed_placeholder_feed_items.py summarizer-lab
-```
-
-(requires Application Default Credentials). Deletes/re-runs are safe; ids start with `SEED_`.
-
-### Automatic first-time ingest on deploy
-
-Set Cloud Run env vars (example):
-
-`INITIAL_INGEST_ON_STARTUP=true` and `YOUTUBE_API_KEY=...` so the first revision with an empty Firestore collection pulls placeholder channels without a manual `curl`. To always run an ingest pass on every cold start (heavier), also set `FORCE_INGEST_ON_STARTUP=true`.
-
-### Cloud Run IAM
-
-Service account needs **Vertex AI User** and Firestore via **Cloud Datastore User** (or broader Firestore roles as needed). If **`INGEST_SECRET`** comes from Secret **`hackathon-ingest-secret`**, the runtime SA also needs **`roles/secretmanager.secretAccessor`** on that secret.
-
-For details on how to use this sample as a template in Cloud Code, read the documentation for Cloud Code for [VS Code](https://cloud.google.com/code/docs/vscode/quickstart-cloud-run?utm_source=ext&utm_medium=partner&utm_campaign=CDR_kri_gcp_cloudcodereadmes_012521&utm_content=-) or [IntelliJ](https://cloud.google.com/code/docs/intellij/quickstart-cloud-run?utm_source=ext&utm_medium=partner&utm_campaign=CDR_kri_gcp_cloudcodereadmes_012521&utm_content=-).
-
-### Table of Contents
-* [Getting Started with VS Code](#getting-started-with-vs-code)
-* [Getting Started with IntelliJ](#getting-started-with-intellij)
-* [Sign up for User Research](#sign-up-for-user-research)
-
----
-## Getting Started with VS Code
-
-### Run the app locally with the Cloud Run Emulator
-1. In the Cloud Code status bar, click on the active project name and select 'Run on Cloud Run Emulator'.  
-![image](./img/status-bar.png)
-
-2. Use the Cloud Run Emulator dialog to specify your [builder option](https://cloud.google.com/code/docs/vscode/deploying-a-cloud-run-app#deploying_a_cloud_run_service). Cloud Code supports Docker, Jib, and Buildpacks. See the skaffold documentation on [builders](https://skaffold.dev/docs/builders/) for more information about build artifact types.  
-![image](./img/build-config.png)
-
-3. Click ‘Run’. Cloud Code begins building your image.
-
-4. View the build progress in the OUTPUT window. Once the build has finished, click on the URL in the OUTPUT window to view your live application.  
-![image](./img/cloud-run-url.png)
-
-5. To stop the application, click the stop icon on the Debug Toolbar.
-
----
-## Getting Started with IntelliJ
-
-### Run the app locally with the Cloud Run Emulator
-
-#### Define run configuration
-
-1. Click the Run/Debug configurations dropdown on the top taskbar and select 'Edit Configurations'.  
-![image](./img/edit-config.png)
-
-2. Select 'Cloud Run: Run Locally' and specify your [builder option](https://cloud.google.com/code/docs/intellij/developing-a-cloud-run-app#defining_your_run_configuration). Cloud Code supports Docker, Jib, and Buildpacks. See the skaffold documentation on [builders](https://skaffold.dev/docs/builders/) for more information about build artifact types.  
-![image](./img/local-build-config.png)
-
-#### Run the application
-1. Click the Run/Debug configurations dropdown and select 'Cloud Run: Run Locally'. Click the run icon.  
-![image](./img/config-run-locally.png)
-
-2. View the build process in the output window. Once the build has finished, you will receive a notification from the Event Log. Click 'View' to access the local URLs for your deployed services.  
-![image](./img/local-success.png)
-
----
-## Sign up for User Research
-
-We want to hear your feedback!
-
-The Cloud Code team is inviting our user community to sign-up to participate in Google User Experience Research. 
-
-If you’re invited to join a study, you may try out a new product or tell us what you think about the products you use every day. At this time, Google is only sending invitations for upcoming remote studies. Once a study is complete, you’ll receive a token of thanks for your participation such as a gift card or some Google swag. 
-
-[Sign up using this link](https://google.qualtrics.com/jfe/form/SV_4Me7SiMewdvVYhL?reserved=1&utm_source=In-product&Q_Language=en&utm_medium=own_prd&utm_campaign=Q1&productTag=clou&campaignDate=January2021&referral_code=UXbT481079) and answer a few questions about yourself, as this will help our research team match you to studies that are a great fit.
+Do **not** change **`origin`** to **`yt-naslovnica`** until step **1** is done, or **`git fetch`/`pull`** will fail until the repo exists under that name.
