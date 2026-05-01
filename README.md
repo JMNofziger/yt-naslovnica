@@ -79,7 +79,7 @@ Create a **YouTube Data API key** under APIs & Services → Credentials (Console
 | `GEMINI_MODEL` | No | Model id (default `gemini-2.5-flash`). |
 | `YOUTUBE_API_KEY` | Ingestion | YouTube Data API v3 key. |
 | `YOUTUBE_CHANNEL_IDS` | Ingestion override | Comma-separated channel **ids** (`UC…`) and/or **URLs** with `/@handle/` (or bare handles). **If unset**, built-in Croatia/expat placeholder channels are used (see `DEFAULT_CHANNEL_SOURCES` in `app.py`). |
-| `INGEST_SECRET` | **Required for `/tasks/ingest`** | Shared secret. HTTP ingest returns **503** if unset. Callers must send **`X-Ingest-Secret: <value>`** or **`Authorization: Bearer <value>`** (Cloud Scheduler / curl / GitHub Actions can all set custom headers). **`INITIAL_INGEST_ON_STARTUP`** still calls `perform_ingestion()` in-process and does not hit this route. |
+| `INGEST_SECRET` | **Required for `/tasks/ingest`** | Shared secret; **503** if unset on the service. Callers use **`X-Ingest-Secret`** or **`Bearer`**. **Prod:** mount **`INGEST_SECRET=hackathon-ingest-secret:latest`** (Secret Manager). **`INITIAL_INGEST_ON_STARTUP`** still runs `perform_ingestion()` in-process and skips this route. |
 | `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
 | `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `20`). |
 | `INITIAL_INGEST_ON_STARTUP` | No | If `true`, run one ingest in the background when the container starts **only if `feed_items` is empty** (first deploy). Requires `python app.py` as entrypoint (not all process managers). |
@@ -90,6 +90,25 @@ Create a **YouTube Data API key** under APIs & Services → Credentials (Console
 ### Firestore
 
 Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title_raw` (original YouTube title), **`title`** (concise English card headline from Gemini), `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. The **active feed** shows items whose **`published_at` is within the last `FEED_DAYS`** (default **30**, override with env `FEED_DAYS`); older items appear under `/archive`.
+
+### Production ingest secret (Secret Manager + Scheduler)
+
+On **`summarizer-lab`**, production uses Secret **`hackathon-ingest-secret`**. Cloud Run **`hackathon`** maps **`INGEST_SECRET`** from **`hackathon-ingest-secret:latest`** (runtime SA needs **`roles/secretmanager.secretAccessor`**). After rotating secret versions:
+
+```bash
+gcloud run services update hackathon \
+  --region=europe-west1 --project=summarizer-lab \
+  --update-secrets=INGEST_SECRET=hackathon-ingest-secret:latest
+```
+
+Cloud Scheduler stores HTTP headers on the job (it does not pull Secret Manager each run). Re-sync headers whenever the secret value changes:
+
+```bash
+chmod +x scripts/sync_hackathon_ingest_scheduler.sh
+./scripts/sync_hackathon_ingest_scheduler.sh   # default job: hackathon-feed-ingest, 06:00 UTC daily
+```
+
+*(Script reads the latest secret via `gcloud secrets versions access` and passes `--quiet >/dev/null` to Scheduler commands so header values are not printed.)*
 
 ### Local run
 
@@ -103,36 +122,24 @@ python app.py
 
 ### Manual ingest (force a run now)
 
-**`INGEST_SECRET` must be set** on the Cloud Run service (and locally if you hit `/tasks/ingest`). Authenticate with either header:
+**`INGEST_SECRET` must be set** on the Cloud Run service (and locally if you hit `/tasks/ingest`). Prefer fetching from Secret Manager instead of typing the value:
 
 ```bash
-export SERVICE_URL="https://hackathon-818144832337.europe-west1.run.app"
-export INGEST_SECRET="your-secret"   # match Cloud Run env
-
+SERVICE_URL="$(gcloud run services describe hackathon --region=europe-west1 --project=summarizer-lab --format='value(status.url)')"
 curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
-  -H "X-Ingest-Secret: ${INGEST_SECRET}"
-# or:
+  -H "X-Ingest-Secret: $(gcloud secrets versions access latest --secret=hackathon-ingest-secret --project=summarizer-lab)"
+# or Bearer:
 curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
-  -H "Authorization: Bearer ${INGEST_SECRET}"
+  -H "Authorization: Bearer $(gcloud secrets versions access latest --secret=hackathon-ingest-secret --project=summarizer-lab)"
 ```
 
-Use `-v` to confirm HTTP status. **`403`** means wrong/missing secret; **`503`** with a JSON error means `INGEST_SECRET` is not configured on the server.
+For ad-hoc runs outside GCP, set **`INGEST_SECRET`** in your environment to match the value Cloud Run sees.
+
+**`403`** → wrong/missing header; **`503`** JSON → `INGEST_SECRET` not configured on the server.
 
 ### Cloud Scheduler (automation)
 
-Create or edit the job so the HTTP target includes the same secret header Cloud Run expects, for example:
-
-```bash
-gcloud scheduler jobs create http youtube-newsfeed-ingest \
-  --project=summarizer-lab \
-  --location=europe-west1 \
-  --schedule="0 6 * * *" \
-  --uri="${SERVICE_URL}/tasks/ingest" \
-  --http-method=POST \
-  --headers="User-Agent=Google-Cloud-Scheduler,X-Ingest-Secret=${INGEST_SECRET}"
-```
-
-(Use **Secret Manager** + substitution for production rather than inline plaintext in shell history.)
+Prefer **`scripts/sync_hackathon_ingest_scheduler.sh`** so headers stay aligned with **`hackathon-ingest-secret:latest`** without copying secrets into shell history. Scheduler job definitions still contain header values in the control plane—restrict IAM on **`cloudscheduler.jobs.get`** / **`run.job`** roles accordingly.
 
 ### Optional: placeholder rows without ingestion
 
@@ -152,7 +159,7 @@ Set Cloud Run env vars (example):
 
 ### Cloud Run IAM
 
-Service account needs **Vertex AI User** and Firestore via **Cloud Datastore User** (or broader Firestore roles as needed).
+Service account needs **Vertex AI User** and Firestore via **Cloud Datastore User** (or broader Firestore roles as needed). If **`INGEST_SECRET`** comes from Secret **`hackathon-ingest-secret`**, the runtime SA also needs **`roles/secretmanager.secretAccessor`** on that secret.
 
 For details on how to use this sample as a template in Cloud Code, read the documentation for Cloud Code for [VS Code](https://cloud.google.com/code/docs/vscode/quickstart-cloud-run?utm_source=ext&utm_medium=partner&utm_campaign=CDR_kri_gcp_cloudcodereadmes_012521&utm_content=-) or [IntelliJ](https://cloud.google.com/code/docs/intellij/quickstart-cloud-run?utm_source=ext&utm_medium=partner&utm_campaign=CDR_kri_gcp_cloudcodereadmes_012521&utm_content=-).
 
