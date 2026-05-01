@@ -17,7 +17,7 @@
 {% elif error %}
 <p class="feed-error">{{ error }}</p>
 {% elif not items %}
-<p class="feed-empty">Nothing in the archive yet. Older than one week posts appear here.</p>
+<p class="feed-empty">Nothing in the archive yet. Posts older than the active feed window appear here.</p>
 {% endif %}
 <div class="card-list">
   {% for item in items %}

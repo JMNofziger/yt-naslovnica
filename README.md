@@ -6,7 +6,7 @@
 
 Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firestore storage, optional ingestion via YouTube Data API (`POST /tasks/ingest`).
 
-**Canonical Cloud Run service:** deploy this repo to **`hackathon`** (`summarizer-lab`, `europe-west1`). Example URL shape: `https://hackathon-<PROJECT_NUMBER>.europe-west1.run.app`. The **`youtube-summarizer`** service name is legacy—ignore it unless you explicitly maintain it.
+**Canonical Cloud Run service:** deploy this repo to **`hackathon`** (`summarizer-lab`, `europe-west1`). Example URL shape: `https://hackathon-<PROJECT_NUMBER>.europe-west1.run.app`. The legacy **`youtube-summarizer`** Cloud Run service has been removed from this project.
 
 ### Required before anything works: Firestore
 
@@ -77,14 +77,15 @@ Create a **YouTube Data API key** under APIs & Services → Credentials (Console
 | `YOUTUBE_CHANNEL_IDS` | Ingestion override | Comma-separated channel **ids** (`UC…`) and/or **URLs** with `/@handle/` (or bare handles). **If unset**, built-in Croatia/expat placeholder channels are used (see `DEFAULT_CHANNEL_SOURCES` in `app.py`). |
 | `INGEST_SECRET` | Recommended | If set, ingest requires header `X-Ingest-Secret`. |
 | `INGEST_LOOKBACK_DAYS` | No | Search window (default `30`). |
-| `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `25`). |
+| `MAX_VIDEOS_PER_RUN` | No | Max new summaries per run (default `20`). |
 | `INITIAL_INGEST_ON_STARTUP` | No | If `true`, run one ingest in the background when the container starts **only if `feed_items` is empty** (first deploy). Requires `python app.py` as entrypoint (not all process managers). |
 | `FORCE_INGEST_ON_STARTUP` | No | If `true`, run startup ingest even when the feed already has items (still skips videos already stored). Often used with `INITIAL_INGEST_ON_STARTUP=true`. |
+| `FEED_DAYS` | No | Active feed window by video publish date (default `30`). Older docs show under `/archive`. |
 | `PORT` | No | Listen port (default `8080`). |
 
 ### Firestore
 
-Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title`, `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. Feed shows items published in the last 7 days; older items appear under `/archive`.
+Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title`, `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. The **active feed** shows items whose **`published_at` is within the last `FEED_DAYS`** (default **30**, override with env `FEED_DAYS`); older items appear under `/archive`.
 
 ### Local run
 

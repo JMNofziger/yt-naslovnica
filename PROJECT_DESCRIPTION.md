@@ -8,7 +8,7 @@ Built as a **prototype**: one Flask app, one Firestore collection, no accounts, 
 
 ## The pitch (30 seconds)
 
-Keeping up with several channels means opening YouTube and losing an hour. This project **pulls recent uploads from channels you care about**, asks Gemini **what was actually discussed**, and puts it all on **one page** so you can skim in seconds—then dip into the video only when it matters. Older stuff rolls into an **archive** so the main feed stays focused on roughly the **last week** of publishing activity.
+Keeping up with several channels means opening YouTube and losing an hour. This project **pulls recent uploads from channels you care about**, asks Gemini **what was actually discussed**, and puts it all on **one page** so you can skim in seconds—then dip into the video only when it matters. Older stuff rolls into an **archive** so the main feed stays focused on roughly the **last month** of publishing activity (configurable via `FEED_DAYS`).
 
 ---
 
@@ -16,7 +16,7 @@ Keeping up with several channels means opening YouTube and losing an hour. This 
 
 | Area | Behavior |
 |------|----------|
-| **Feed** | Home page lists cards for videos whose **publish date** falls within the **last 7 days** (config-style constant in code). |
+| **Feed** | Home page lists cards for videos whose **publish date** falls within the **last 30 days** by default (`FEED_DAYS` env override). |
 | **Archive** | Anything older than that window still lives under `/archive`, same card layout. |
 | **Summaries** | Each item stores a **Gemini-generated summary** of the video (same pattern as the original Vertex “summarize this YouTube URL” demo). |
 | **Votes** | Visitors can **upvote or downvote** items without logging in; counts are stored **on the item document** (simple counters). |
@@ -32,8 +32,17 @@ If `YOUTUBE_CHANNEL_IDS` is not set, ingestion falls back to these (handles reso
 - [Paul Bradbury](https://www.youtube.com/@PaulBradbury/videos)
 - [Living in Croatia](https://www.youtube.com/@livingincroatia/videos)
 - [Expat Life in Croatia](https://www.youtube.com/@expatlifeincroatia/videos)
-- [HRT](https://www.youtube.com/@Hrvatskaradiotelevizija_HRT/videos)
+- [Expat in Croatia](https://www.youtube.com/@ExpatinCroatia/videos)
 - [Total Croatia News](https://www.youtube.com/@TotalCroatiaNews/videos)
+- [HRT](https://www.youtube.com/@Hrvatskaradiotelevizija_HRT/videos)
+- [The Dubrovnik Times](https://www.youtube.com/@dubrovniktimes/videos)
+- [Visit Zagreb](https://www.youtube.com/@VisitZagreb/videos)
+- [Croatia, Full of Life](https://www.youtube.com/@CroatiaFullOfLife/videos) (national tourism)
+- [Zagreb Explorer](https://www.youtube.com/@ZagrebExplorer/videos)
+- [Croatia Uncovered](https://www.youtube.com/@CroatiaUncovered/videos)
+- [Korčula Explorer](https://www.youtube.com/@KorculaExplorer/videos)
+
+Other Croatia-/Zagreb-adjacent handles we spot-checked (often Croatian-language, **high volume**—add only if you want that noise): `@vecernjiTV`, `@RTLdan`, `@Hrvatskapolitika`.
 
 Swap them anytime via environment variables or fork the list in `app.py`.
 

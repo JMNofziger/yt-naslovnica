@@ -26,17 +26,26 @@ VERTEX_LOCATION = os.environ.get("VERTEX_LOCATION", "europe-west1")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 COLLECTION = "feed_items"
-FEED_DAYS = 7
-MAX_VIDEOS_PER_RUN = int(os.environ.get("MAX_VIDEOS_PER_RUN", "25"))
+FEED_DAYS = int(os.environ.get("FEED_DAYS", "30"))
+MAX_VIDEOS_PER_RUN = int(os.environ.get("MAX_VIDEOS_PER_RUN", "20"))
 INGEST_LOOKBACK_DAYS = int(os.environ.get("INGEST_LOOKBACK_DAYS", "30"))
 
 # Used when YOUTUBE_CHANNEL_IDS is unset: @handle URLs resolved via Data API (forHandle).
 DEFAULT_CHANNEL_SOURCES = (
+    # Expats / English-language Croatia life & bureaucracy
     "https://www.youtube.com/@PaulBradbury/videos",
     "https://www.youtube.com/@livingincroatia/videos",
     "https://www.youtube.com/@expatlifeincroatia/videos",
-    "https://www.youtube.com/@Hrvatskaradiotelevizija_HRT/videos",
+    "https://www.youtube.com/@ExpatinCroatia/videos",
+    # News / national broadcaster / Zagreb tourism / regions (all Croatia-scoped)
     "https://www.youtube.com/@TotalCroatiaNews/videos",
+    "https://www.youtube.com/@Hrvatskaradiotelevizija_HRT/videos",
+    "https://www.youtube.com/@dubrovniktimes/videos",
+    "https://www.youtube.com/@VisitZagreb/videos",
+    "https://www.youtube.com/@CroatiaFullOfLife/videos",
+    "https://www.youtube.com/@ZagrebExplorer/videos",
+    "https://www.youtube.com/@CroatiaUncovered/videos",
+    "https://www.youtube.com/@KorculaExplorer/videos",
 )
 
 _CHANNEL_ID_UC = re.compile(r"^UC[a-zA-Z0-9_-]{22}$")
