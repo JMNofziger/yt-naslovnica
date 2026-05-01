@@ -1,99 +1,122 @@
 # YT Naslovnica
 
-An **aggregated front page of hand-picked YouTube sources** focused on **Croatia and Zagreb** — national and regional news, broadcasters, tourism, expat life, and related channels. A scheduler triggers **automatic ingestion** of recent uploads; each item gets a **short English headline and summary** (Vertex Gemini). Visitors **vote up or down**; **ordering favors higher scores** so favorites surface above newer-but-weaker posts (within the active feed window).
+An **aggregated front page** built from **hand-picked YouTube channels** oriented toward **Croatia and Zagreb**: national and regional news, broadcasters, tourism, expat-oriented creators, and related topics. Scheduled jobs pull **recent uploads**, generate a **short English headline and summary** per video via **Vertex AI (Gemini)**, and persist everything for the web UI. Visitors **vote** on items; the **main feed lists recent posts** (configurable window) **sorted primarily by upvotes**, then **newest first**, so strong items stay visible. Older posts move to **`/archive`**.
 
-The UI brand in-app is **“Youtube Naslovnica”** / compact **“YT Naslovnica”** on small screens.
+In-product branding: **Youtube Naslovnica** (compact **YT Naslovnica** on narrow screens).
 
-**Reference deployment:** Cloud Run service **`hackathon`**, GCP project **`summarizer-lab`**, region **`europe-west1`** (URL shape: `https://hackathon-<PROJECT_NUMBER>.europe-west1.run.app`).
+**Where it runs:** packaged as a **Docker** image and served on **Google Cloud Run** (`hackathon`, project **`summarizer-lab`**, region **`europe-west1`**).
 
-## Stack
+---
 
-Python **Flask**, **Firestore**, **Vertex AI (Gemini)**, **YouTube Data API v3**, **Docker** → Cloud Run.
+## Architecture
 
-## Operator quick path
+The system is a **single Flask application** behind Cloud Run. It renders HTML, talks to **Firestore** for persisted feed rows, calls **YouTube Data API v3** to discover videos and resolve channels, and calls **Vertex AI** so Gemini summarizes each new video from its watch URL.
 
-```bash
-export CLOUDSDK_CORE_DISABLE_PROMPTS=1
-export GOOGLE_CLOUD_PROJECT=summarizer-lab   # or yours
+**Ingress (browser):**
 
-cd yt-naslovnica   # repository root (local folder may still be `youtube-summarizer-1`)
-pip install -r requirements.txt
+- **`GET /`** — active feed (published within `FEED_DAYS`, default 30), ordered after load by **upvotes desc**, then **publish time desc**.
+- **`GET /archive`** — items older than that window (larger query limit).
+- **`POST /vote`** — increments `upvotes` or `downvotes` on a `feed_items` document and redirects back.
+- **`GET|POST /summarize`** — optional path to summarize an arbitrary pasted YouTube URL (primarily utility / experimentation).
 
-chmod +x scripts/setup_gcp_infrastructure.sh
-./scripts/setup_gcp_infrastructure.sh "$GOOGLE_CLOUD_PROJECT"
+**Background ingestion:**
+
+- **`POST /tasks/ingest`** — protected by **`INGEST_SECRET`** (header or bearer); runs one ingestion pass. In production this is invoked on a timer (e.g. **Cloud Scheduler**) so the corpus stays fresh without user action.
+
+**On cold start**, optional env flags (**`INITIAL_INGEST_ON_STARTUP`**, **`FORCE_INGEST_ON_STARTUP`**) can trigger a single in-process ingest in the background (`app.py`); that path does not require the HTTP secret.
+
+### Diagram
+
+```mermaid
+flowchart TB
+  subgraph Visitors
+    B[Browser]
+  end
+
+  subgraph Run["Cloud Run — Flask app"]
+    API[HTTP: pages, vote, ingest, summarize]
+  end
+
+  subgraph Data
+    FS[("Firestore: feed_items")]
+  end
+
+  subgraph External["Google APIs"]
+    YT[YouTube Data API v3 — search / channels]
+    VX[Vertex AI Gemini — summarize from URL]
+  end
+
+  subgraph Ops["Scheduling & secrets"]
+    SCH[Cloud Scheduler\nor equivalent]
+    SM[Secret Manager\nINGEST_SECRET]
+  end
+
+  B -->|GET /, /archive| API
+  B -->|POST /vote| API
+  API <--> FS
+  API --> YT
+  API --> VX
+  SCH -->|POST /tasks/ingest\n+ auth header| API
+  SM -.->|mounted as env\non service| API
 ```
 
-Create a **YouTube Data API key** (Console → APIs & Services → Credentials). Set **`YOUTUBE_API_KEY`** on Cloud Run.
+### Ingest sequence (one scheduled run)
 
-Secure ingest: **`INGEST_SECRET`** must be set for **`POST /tasks/ingest`**. Production mounts **`hackathon-ingest-secret`** from Secret Manager. After rotating that secret, refresh Scheduler headers:
+```mermaid
+sequenceDiagram
+    participant Scheduler
+    participant App as Flask on Cloud Run
+    participant FS as Firestore
+    participant YT as YouTube Data API
+    participant Gemini as Vertex AI Gemini
 
-```bash
-chmod +x scripts/sync_hackathon_ingest_scheduler.sh
-./scripts/sync_hackathon_ingest_scheduler.sh
+    Scheduler->>App: POST /tasks/ingest (shared secret header)
+    App->>App: authorize (compare to INGEST_SECRET)
+    App->>FS: lightweight read — ensure DB reachable
+
+    loop each channel reference
+        App->>YT: resolve to channel ID (handles / URLs)
+    end
+
+    loop each resolved channel
+        App->>YT: search recent videos (publishedAfter, lookback)
+    end
+
+    App->>App: dedupe video IDs, newest first, apply per-run cap
+
+    loop each candidate not yet in feed_items
+        App->>FS: fetch document by video ID — skip if exists
+        App->>Gemini: generate summary from watch URL
+        Gemini-->>App: summary text (and spoken-language hint when available)
+        App->>FS: create feed_items document (votes zeroed)
+    end
+
+    App-->>Scheduler: JSON result (counts, warnings, errors)
 ```
 
-**Deploy / redeploy** (preserves Secret-ref pattern):
+### Ingest pipeline (conceptual)
 
-```bash
-gcloud run deploy hackathon --source . --region europe-west1 --project summarizer-lab \
-  --timeout=900 \
-  --set-secrets=INGEST_SECRET=hackathon-ingest-secret:latest
-```
+1. **Sources:** channel list from configuration (env) or **`DEFAULT_CHANNEL_SOURCES`** in **`app.py`** — handles/`@handles`/URLs resolved to channel IDs via YouTube.
+2. **Discovery:** **`search.list`** per channel inside a **lookback** window; cap **maximum new videos per run**.
+3. **Deduplication:** document id = YouTube **`video_id`** — existing docs are skipped.
+4. **Enrichment:** English card title normalization; **Gemini** summary (and spoken-language hint where available); write document with votes initialized to zero.
 
-**Manual ingest** (example):
-
-```bash
-SERVICE_URL="$(gcloud run services describe hackathon --region europe-west1 --project summarizer-lab --format='value(status.url)')"
-curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
-  -H "X-Ingest-Secret: $(gcloud secrets versions access latest --secret=hackathon-ingest-secret --project summarizer-lab)"
-```
-
-Use **`CLOUDSDK_CORE_DISABLE_PROMPTS=1`** in automation so **`gcloud`** never blocks on API-enable **`y/N`** prompts.
-
-## Environment variables
-
-| Variable | Purpose |
-|----------|---------|
-| `GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT` | GCP project (default in code: `summarizer-lab`) |
-| `YOUTUBE_API_KEY` | Ingestion / channel resolution |
-| `INGEST_SECRET` | **`POST /tasks/ingest`** — **`503`** if unset on service |
-| `YOUTUBE_CHANNEL_IDS` | Optional comma-separated `UC…` and/or `/@handle/` URLs; else **`DEFAULT_CHANNEL_SOURCES`** in `app.py` |
-| `VERTEX_LOCATION`, `GEMINI_MODEL` | Vertex defaults `europe-west1`, `gemini-2.5-flash` |
-| `FEED_DAYS` | Published-after cutoff for main feed vs **`/archive`** (default **30**) |
-| `MAX_VIDEOS_PER_RUN`, `INGEST_LOOKBACK_DAYS` | Ingest caps / search window |
-
-Startup ingest flags (**`INITIAL_INGEST_ON_STARTUP`**, **`FORCE_INGEST_ON_STARTUP`**) are documented in **`app.py`**.
-
-Runtime SA needs Firestore (**Datastore User**), **Vertex AI User**, and **Secret Accessor** on the ingest secret if used.
+---
 
 ## Data model
 
-Firestore **`feed_items`**, document id = YouTube video id — **`title`**, **`title_raw`**, **`url`**, **`channel`**, **`published_at`**, **`summary`**, **`primary_language`**, **`upvotes`**, **`downvotes`**.
+Collection **`feed_items`**, document id = YouTube video id.
 
-## Local development
+Stored fields include **`title`** (display headline), **`title_raw`**, **`url`**, **`channel`**, **`published_at`**, **`summary`**, **`primary_language`**, **`upvotes`**, **`downvotes`**.
 
-```bash
-pip install -r requirements.txt
-export GOOGLE_CLOUD_PROJECT=summarizer-lab
-gcloud auth application-default login
-python app.py
-```
+---
 
-Optional empty-db demo rows: **`scripts/seed_placeholder_feed_items.py`**. One-off diversity backfill: **`scripts/oneoff_one_video_per_channel.py`**.
+## Components (stack)
 
-## Git remote & integrations
-
-**Canonical repo:** `https://github.com/JMNofziger/yt-naslovnica` · SSH: `git@github.com:JMNofziger/yt-naslovnica.git`
-
-This workspace clone uses that **`origin`** URL (verify: `git remote -v`).
-
-**Other machines / CI:** if `origin` still mentions `youtube-summarizer-1`:
-
-```bash
-git remote set-url origin git@github.com:JMNofziger/yt-naslovnica.git
-git fetch origin
-```
-
-**GCP (`summarizer-lab`):** Cloud Build has **no** GitHub-connected triggers for this app (deploys use `gcloud run deploy --source .` from an authenticated environment). If you add triggers later, connect **`JMNofziger/yt-naslovnica`**.
-
-**Cursor / IDE:** If the editor cached the old GitHub URL, use **File → Open Folder** on your clone and confirm **Git: Remote** shows **`yt-naslovnica`** (or run `git remote -v` in the integrated terminal).
+| Layer | Role |
+|-------|------|
+| **Flask + Jinja templates** | Server-rendered UI and form posts |
+| **Firestore** | Durable feed and vote counters |
+| **YouTube Data API v3** | Channel resolution and recent video discovery |
+| **Vertex AI / Gemini** | Per-video summaries from watch URLs |
+| **Cloud Run** | Stateless container runtime; autoscaled HTTPS endpoint |
