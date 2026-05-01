@@ -1,5 +1,12 @@
 .cache_audit/
 
+# Editor / IDE — local only
+.vscode/
+.idea/
+*.iml
+
+.DS_Store
+
 __pycache__/
 *.py[cod]
 .venv/
