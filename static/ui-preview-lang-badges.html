@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Language badge options · UI preview</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 24px 16px 48px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #dae0e6;
+      color: #1a1a1b;
+    }
+    .preview-wrap {
+      max-width: 840px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.25rem;
+      margin: 0 0 8px;
+      font-weight: 700;
+    }
+    .preview-lede {
+      font-size: 14px;
+      color: #787c7e;
+      margin: 0 0 20px;
+      line-height: 1.45;
+    }
+    .preview-grid {
+      display: grid;
+      gap: 16px;
+    }
+    @media (min-width: 700px) {
+      .preview-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    .preview-panel {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      padding: 14px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    .preview-panel h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #787c7e;
+      margin: 0 0 10px;
+      font-weight: 700;
+    }
+    .preview-panel p.desc {
+      font-size: 12px;
+      color: #586174;
+      margin: 0 0 12px;
+      line-height: 1.4;
+    }
+    .fake-card-row {
+      display: flex;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .fake-vote {
+      width: 40px;
+      flex-shrink: 0;
+      background: #f8f9fa;
+      border-right: 1px solid #edeff1;
+    }
+    .fake-body {
+      padding: 10px 12px 12px;
+      flex: 1;
+      min-width: 0;
+    }
+    .footnote {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #787c7e;
+    }
+    .footnote code {
+      background: #edeff1;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-wrap">
+    <h1>Language badge — visual options</h1>
+    <p class="preview-lede">
+      The live feed uses the <strong>soft pill</strong> (<code>card-lang-badge</code> only). Alternate looks use optional modifier classes; resize to see wrapping on narrow cards.
+    </p>
+
+    <div class="preview-grid">
+      <div class="preview-panel">
+        <h2>A · Soft pill (production)</h2>
+        <p class="desc">Flat grey fill, no shadow — default in <code>templates/_card.html</code>.</p>
+        <div class="fake-card-row">
+          <div class="fake-vote" aria-hidden="true"></div>
+          <div class="fake-body">
+            <div class="card-title-row">
+              <h2 class="card-title"><a href="#">Visit Zagreb summer events announced</a></h2>
+              <span class="card-lang-badge notranslate" translate="no" aria-label="Spoken language: HR">
+                <span class="card-lang-flag" aria-hidden="true">🇭🇷</span>
+                <span class="card-lang-code">HR</span>
+              </span>
+            </div>
+            <div class="card-meta">Visit Zagreb · 2 hr ago</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-panel">
+        <h2>B · Gradient pill (alternate)</h2>
+        <p class="desc">Subtle gradient + inset highlight — add <code>card-lang-badge--gradient</code> on the badge span.</p>
+        <div class="fake-card-row">
+          <div class="fake-vote" aria-hidden="true"></div>
+          <div class="fake-body">
+            <div class="card-title-row">
+              <h2 class="card-title"><a href="#">Daily news roundup from Zagreb studio</a></h2>
+              <span class="card-lang-badge card-lang-badge--gradient notranslate" translate="no" aria-label="Spoken language: HR">
+                <span class="card-lang-flag" aria-hidden="true">🇭🇷</span>
+                <span class="card-lang-code">HR</span>
+              </span>
+            </div>
+            <div class="card-meta">N1 HR · yesterday</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-panel">
+        <h2>C · Outline accent</h2>
+        <p class="desc">Brand-tinted border and blue type — strongest “tag” emphasis.</p>
+        <div class="fake-card-row">
+          <div class="fake-vote" aria-hidden="true"></div>
+          <div class="fake-body">
+            <div class="card-title-row">
+              <h2 class="card-title"><a href="#">Interview in English about life in Croatia</a></h2>
+              <span class="card-lang-badge card-lang-badge--outline notranslate" translate="no" aria-label="Spoken language: EN">
+                <span class="card-lang-flag" aria-hidden="true">🇬🇧</span>
+                <span class="card-lang-code">EN</span>
+              </span>
+            </div>
+            <div class="card-meta">Paul Bradbury · 3 days ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="preview-panel preview-wrap" style="margin-top: 16px;">
+      <h2>Unknown / not detected</h2>
+      <p class="desc">Muted chip when Gemini did not return a language code (<code>card-lang-badge--unknown</code>).</p>
+      <div class="fake-card-row" style="max-width: 480px;">
+        <div class="fake-vote" aria-hidden="true"></div>
+        <div class="fake-body">
+          <div class="card-title-row">
+            <h2 class="card-title"><a href="#">Short clip with unclear audio</a></h2>
+            <span class="card-lang-badge card-lang-badge--unknown notranslate" translate="no" aria-label="Spoken language not detected">
+              <span class="card-lang-flag" aria-hidden="true">🌐</span>
+              <span class="card-lang-code">—</span>
+            </span>
+          </div>
+          <div class="card-meta">Channel · just now</div>
+        </div>
+      </div>
+    </section>
+
+    <p class="footnote">
+      Open while the Flask app is running (same origin as the feed): <code>/static/ui-preview-lang-badges.html</code><br>
+      Classes: <code>card-lang-badge</code> (default soft), <code>card-lang-badge--gradient</code>, <code>card-lang-badge--outline</code>, <code>card-lang-badge--unknown</code>.
+    </p>
+  </div>
+</body>
+</html>
