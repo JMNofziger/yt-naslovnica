@@ -6,12 +6,15 @@ not already in Firestore (same doc shape as normal ingest).
 Uses helpers from app.py (does not change ingest routes or caps).
 
 Requires:
+  - Same `pip install -r requirements.txt` as the Flask app (google-cloud-firestore, google-genai, …)
   - YOUTUBE_API_KEY
   - GOOGLE_CLOUD_PROJECT / GCP_PROJECT (or default summarizer-lab)
   - Application Default Credentials with Firestore + Vertex (same as Cloud Run runtime)
 
 Example:
   cd youtube-summarizer-1
+  source .venv/bin/activate   # optional
+  pip install -r requirements.txt
   export YOUTUBE_API_KEY=...
   export GOOGLE_CLOUD_PROJECT=summarizer-lab
   gcloud auth application-default login
@@ -32,7 +35,16 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import app as newsfeed  # noqa: E402
+try:
+    import app as newsfeed  # noqa: E402
+except ModuleNotFoundError as exc:
+    print(
+        "Missing Python dependencies. Install the app requirements in this environment:\n"
+        f"  cd {ROOT}\n"
+        "  pip install -r requirements.txt\n",
+        file=sys.stderr,
+    )
+    raise SystemExit(1) from exc
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("oneoff_one_video_per_channel")
