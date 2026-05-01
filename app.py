@@ -3,6 +3,7 @@ import os
 import re
 import threading
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import requests
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
@@ -55,6 +56,32 @@ def get_fs():
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def firestore_missing_ui_context(exc: BaseException, project_id: str) -> dict:
+    """
+    Detect Firestore/Datastore 'database does not exist' errors for friendlier UI/API hints.
+    """
+    raw = str(exc)
+    lower = raw.lower()
+    if "does not exist" not in lower:
+        return {}
+    if not any(
+        k in lower for k in ("database", "firestore", "datastore", "cloud datastore")
+    ):
+        return {}
+    pid = quote(project_id, safe="")
+    return {
+        "firestore_missing": True,
+        "firestore_setup_url": f"https://console.cloud.google.com/datastore/setup?project={pid}",
+        "firestore_console_url": f"https://console.cloud.google.com/firestore/databases?project={pid}",
+        "gcp_project_id": project_id,
+    }
+
+
+def prefetch_firestore_or_raise():
+    """Cheap read so missing-database errors surface early on ingest."""
+    next(get_fs().collection(COLLECTION).limit(1).stream(), None)
 
 
 client = genai.Client(
@@ -226,15 +253,15 @@ def index():
         items = load_items_for_feed(active=True)
     except Exception as e:
         logger.exception("feed query failed")
-        items = []
-        error = str(e)
+        ui = firestore_missing_ui_context(e, PROJECT_ID)
         return render_template(
             "index.html",
             items=[],
             page_title="Feed",
-            error=error,
+            error=None if ui else str(e),
             active_feed=True,
             active_archive=False,
+            **ui,
         )
     return render_template(
         "index.html",
@@ -252,13 +279,15 @@ def archive():
         items = load_items_for_feed(active=False)
     except Exception as e:
         logger.exception("archive query failed")
+        ui = firestore_missing_ui_context(e, PROJECT_ID)
         return render_template(
             "archive.html",
             items=[],
             page_title="Archive",
-            error=str(e),
+            error=None if ui else str(e),
             active_feed=False,
             active_archive=True,
+            **ui,
         )
     return render_template(
         "archive.html",
@@ -343,6 +372,22 @@ def perform_ingestion() -> tuple[dict, int]:
             },
             200,
         )
+
+    try:
+        prefetch_firestore_or_raise()
+    except Exception as e:
+        ui = firestore_missing_ui_context(e, PROJECT_ID)
+        if ui:
+            return (
+                {
+                    "ok": False,
+                    "error": "Firestore database is not provisioned for this GCP project.",
+                    "firestore_setup_url": ui["firestore_setup_url"],
+                    "gcp_project_id": PROJECT_ID,
+                },
+                503,
+            )
+        raise
 
     resolved_ids: list[str] = []
     resolve_warnings: list[dict[str, str]] = []

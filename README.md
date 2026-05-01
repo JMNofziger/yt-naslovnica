@@ -6,6 +6,18 @@
 
 Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firestore storage, optional ingestion via YouTube Data API (`POST /tasks/ingest`).
 
+### Required before anything works: Firestore
+
+The app reads/writes collection **`feed_items`** in **Cloud Firestore (Native mode)** in the **same GCP project** as Cloud Run (`GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT`).
+
+If you see **`404 The database (default) does not exist`**, the database was never created for that project:
+
+1. Open **[Firestore / Datastore setup](https://console.cloud.google.com/firestore)** (pick project **`summarizer-lab`** or whichever project your service uses).
+2. **Create database** → choose **Native mode** → region → finish provisioning.
+3. Ensure Cloud Run’s **`GOOGLE_CLOUD_PROJECT`** matches that project (otherwise you enabled Firestore in the wrong place).
+
+Until Firestore exists, the feed, archive, votes, and ingestion cannot persist data.
+
 ### Environment variables
 
 | Variable | Required | Description |
