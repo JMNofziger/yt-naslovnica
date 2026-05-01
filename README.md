@@ -16,7 +16,7 @@ Python **Flask**, **Firestore**, **Vertex AI (Gemini)**, **YouTube Data API v3**
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 export GOOGLE_CLOUD_PROJECT=summarizer-lab   # or yours
 
-cd yt-naslovnica   # your clone directory (may still be named youtube-summarizer-1 locally)
+cd yt-naslovnica   # repository root (local folder may still be `youtube-summarizer-1`)
 pip install -r requirements.txt
 
 chmod +x scripts/setup_gcp_infrastructure.sh
@@ -81,15 +81,19 @@ python app.py
 
 Optional empty-db demo rows: **`scripts/seed_placeholder_feed_items.py`**. One-off diversity backfill: **`scripts/oneoff_one_video_per_channel.py`**.
 
-## Git remote (other clones / CI)
+## Git remote & integrations
 
-Canonical GitHub repo: **`https://github.com/JMNofziger/yt-naslovnica`**.
+**Canonical repo:** `https://github.com/JMNofziger/yt-naslovnica` · SSH: `git@github.com:JMNofziger/yt-naslovnica.git`
 
-If you still have the old remote URL:
+This workspace clone uses that **`origin`** URL (verify: `git remote -v`).
+
+**Other machines / CI:** if `origin` still mentions `youtube-summarizer-1`:
 
 ```bash
 git remote set-url origin git@github.com:JMNofziger/yt-naslovnica.git
 git fetch origin
 ```
 
-Update **Cloud Build triggers** (or any integration) if they pointed at `youtube-summarizer-1`.
+**GCP (`summarizer-lab`):** Cloud Build has **no** GitHub-connected triggers for this app (deploys use `gcloud run deploy --source .` from an authenticated environment). If you add triggers later, connect **`JMNofziger/yt-naslovnica`**.
+
+**Cursor / IDE:** If the editor cached the old GitHub URL, use **File → Open Folder** on your clone and confirm **Git: Remote** shows **`yt-naslovnica`** (or run `git remote -v` in the integrated terminal).

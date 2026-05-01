@@ -12,7 +12,7 @@ Requires:
   - Application Default Credentials with Firestore + Vertex (same as Cloud Run runtime)
 
 Example:
-  cd youtube-summarizer-1
+  cd yt-naslovnica   # repository root (clone folder name may differ)
   source .venv/bin/activate   # optional
   pip install -r requirements.txt
   export YOUTUBE_API_KEY=...
