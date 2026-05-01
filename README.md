@@ -6,6 +6,8 @@
 
 Server-rendered feed of summarized YouTube videos (Gemini on Vertex AI), Firestore storage, optional ingestion via YouTube Data API (`POST /tasks/ingest`).
 
+**Canonical Cloud Run service:** deploy this repo to **`hackathon`** (`summarizer-lab`, `europe-west1`). Example URL shape: `https://hackathon-<PROJECT_NUMBER>.europe-west1.run.app`. The **`youtube-summarizer`** service name is legacy—ignore it unless you explicitly maintain it.
+
 ### Required before anything works: Firestore
 
 The app reads/writes collection **`feed_items`** in **Cloud Firestore (Native mode)** in the **same GCP project** as Cloud Run (`GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT`).
@@ -104,6 +106,22 @@ curl -sS -X POST "${SERVICE_URL}/tasks/ingest" \
 ```
 
 Use `-v` to confirm HTTP status. Omit `X-Ingest-Secret` if `INGEST_SECRET` is unset (prototype only).
+
+Target **`hackathon`** (your Cloud Run URL), e.g.:
+
+```bash
+curl -sS -X POST "https://hackathon-818144832337.europe-west1.run.app/tasks/ingest"
+```
+
+### Optional: placeholder rows without ingestion
+
+If `YOUTUBE_API_KEY` is not configured yet but you want non-empty UI for demos, run:
+
+```bash
+python3 scripts/seed_placeholder_feed_items.py summarizer-lab
+```
+
+(requires Application Default Credentials). Deletes/re-runs are safe; ids start with `SEED_`.
 
 ### Automatic first-time ingest on deploy
 
