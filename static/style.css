@@ -16,6 +16,15 @@
 	background-color: #dae0e6;
 }
 
+.goog-te-banner-frame.skiptranslate {
+	display: none !important;
+}
+
+body.feed-body {
+	top: 0 !important;
+	position: static !important;
+}
+
 .feed-header {
 	background-color: #fff;
 	border-bottom: 1px solid #edeff1;
@@ -77,26 +86,97 @@
 	background-color: #edeff1;
 }
 
-.header-translate {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+/* Google Translate: tucked behind disclosure so header stays calm */
+.translate-disclosure {
 	flex-shrink: 0;
 	margin-left: auto;
+	position: relative;
 }
 
-.translate-label {
-	font-size: 12px;
+.translate-summary {
+	list-style: none;
+	cursor: pointer;
+	user-select: none;
+}
+
+.translate-summary::-webkit-details-marker {
+	display: none;
+}
+
+.translate-summary-label {
+	display: inline-block;
+	font-size: 14px;
+	font-weight: 600;
+	color: #0079d3;
+	padding: 6px 10px;
+	border-radius: 4px;
+}
+
+.translate-summary:hover .translate-summary-label,
+.translate-disclosure[open] .translate-summary-label {
+	background-color: #f6f7f8;
+	color: #1a1a1b;
+}
+
+.translate-panel {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 6px);
+	z-index: 30;
+	min-width: 220px;
+	max-width: min(320px, calc(100vw - 32px));
+	padding: 12px 14px;
+	background: #fff;
+	border: 1px solid #edeff1;
+	border-radius: 8px;
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+}
+
+.translate-panel-hint {
+	margin: 0 0 10px;
+	font-size: 11px;
+	line-height: 1.35;
 	color: #787c7e;
-	white-space: nowrap;
 }
 
 #google_translate_element {
 	min-height: 28px;
 }
 
-.goog-te-gadget {
-	font-size: 12px !important;
+/* Google-injected markup — normalize to match site typography */
+.translate-panel .goog-te-gadget {
+	font-family: inherit !important;
+	font-size: 13px !important;
+	color: #1a1a1b !important;
+}
+
+.translate-panel .goog-te-gadget-simple .goog-te-menu-value,
+.translate-panel .goog-te-gadget-simple .goog-te-menu-value span {
+	color: #1a1a1b !important;
+	border-color: transparent !important;
+}
+
+.translate-panel .goog-te-combo {
+	margin: 0 !important;
+	width: 100% !important;
+	max-width: 100% !important;
+	padding: 8px 10px !important;
+	font-family: inherit !important;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	color: #1a1a1b !important;
+	background: #f6f7f8 !important;
+	border: 1px solid #edeff1 !important;
+	border-radius: 4px !important;
+	cursor: pointer !important;
+}
+
+.translate-panel .goog-te-gadget-icon {
+	display: none !important;
+}
+
+.translate-panel .goog-te-banner-frame.skiptranslate {
+	display: none !important;
 }
 
 .feed-main {

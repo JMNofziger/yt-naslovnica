@@ -3,23 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ page_title }} · YouTube Newsfeed</title>
+  <title>{{ page_title }} · Youtube Naslovnica</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="feed-body">
   <header class="feed-header">
     <div class="feed-header-inner">
       <div class="feed-header-start notranslate" translate="no">
-        <a href="{{ url_for('index') }}" class="feed-logo">YouTube Newsfeed</a>
+        <a href="{{ url_for('index') }}" class="feed-logo">Youtube Naslovnica</a>
         <nav class="feed-nav">
           <a href="{{ url_for('index') }}" class="{% if active_feed %}active{% endif %}">Feed</a>
           <a href="{{ url_for('archive') }}" class="{% if active_archive %}active{% endif %}">Archive</a>
         </nav>
       </div>
-      <div class="header-translate notranslate" translate="no">
-        <span class="translate-label" title="Uses Google Translate in your browser">Page:</span>
-        <div id="google_translate_element" aria-label="Translate page"></div>
-      </div>
+      <details class="translate-disclosure notranslate" translate="no">
+        <summary class="translate-summary">
+          <span class="translate-summary-label">Translate page</span>
+        </summary>
+        <div class="translate-panel">
+          <p class="translate-panel-hint">Uses Google Translate in your browser (third‑party).</p>
+          <div id="google_translate_element"></div>
+        </div>
+      </details>
     </div>
   </header>
   <main class="feed-main">
