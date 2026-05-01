@@ -16,7 +16,7 @@ Python **Flask**, **Firestore**, **Vertex AI (Gemini)**, **YouTube Data API v3**
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 export GOOGLE_CLOUD_PROJECT=summarizer-lab   # or yours
 
-cd youtube-summarizer-1   # repository root (see rename note below)
+cd yt-naslovnica   # your clone directory (may still be named youtube-summarizer-1 locally)
 pip install -r requirements.txt
 
 chmod +x scripts/setup_gcp_infrastructure.sh
@@ -81,22 +81,15 @@ python app.py
 
 Optional empty-db demo rows: **`scripts/seed_placeholder_feed_items.py`**. One-off diversity backfill: **`scripts/oneoff_one_video_per_channel.py`**.
 
-## Renaming this repository to **`yt-naslovnica`**
+## Git remote (other clones / CI)
 
-GitHub **rename first**, then update clients so nothing depends on the old URL long-term (GitHub redirects for a while, but triggers and bookmarks should move).
+Canonical GitHub repo: **`https://github.com/JMNofziger/yt-naslovnica`**.
 
-1. **GitHub** → repo **Settings → General → Repository name** → **`yt-naslovnica`**.
-2. **Every clone:**
+If you still have the old remote URL:
 
-   ```bash
-   git remote set-url origin git@github.com:JMNofziger/yt-naslovnica.git
-   git fetch origin
-   ```
+```bash
+git remote set-url origin git@github.com:JMNofziger/yt-naslovnica.git
+git fetch origin
+```
 
-   Replace **`JMNofziger`** with your org/user if different.
-
-3. **GCP Cloud Build** (or any CI): reconnect triggers / edit URLs if they pointed at the old repo path.
-
-4. **Cursor / IDE** “linked repo”: reopen from Git clone URL after **`git remote set-url`** if the IDE caches the old path.
-
-Do **not** change **`origin`** to **`yt-naslovnica`** until step **1** is done, or **`git fetch`/`pull`** will fail until the repo exists under that name.
+Update **Cloud Build triggers** (or any integration) if they pointed at `youtube-summarizer-1`.
