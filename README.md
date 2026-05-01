@@ -94,13 +94,6 @@ sequenceDiagram
     App-->>Scheduler: JSON result (counts, warnings, errors)
 ```
 
-### Ingest pipeline (conceptual)
-
-1. **Sources:** channel list from configuration (env) or **`DEFAULT_CHANNEL_SOURCES`** in **`app.py`** — handles/`@handles`/URLs resolved to channel IDs via YouTube.
-2. **Discovery:** **`search.list`** per channel inside a **lookback** window; cap **maximum new videos per run**.
-3. **Deduplication:** document id = YouTube **`video_id`** — existing docs are skipped.
-4. **Enrichment:** English card title normalization; **Gemini** summary (and spoken-language hint where available); write document with votes initialized to zero.
-
 ---
 
 ## Data model

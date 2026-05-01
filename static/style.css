@@ -529,21 +529,6 @@ body.feed-body {
 	word-break: break-word;
 }
 
-/* Optional badge styles — see `/static/ui-preview-lang-badges.html` */
-.card-lang-badge--gradient {
-	color: #586174;
-	background: linear-gradient(180deg, #fbfcfd 0%, #eef1f5 100%);
-	border-color: #dbe0e6;
-	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 1px rgba(0, 0, 0, 0.04);
-}
-
-.card-lang-badge--outline {
-	background: #fff;
-	border-color: rgba(0, 121, 211, 0.35);
-	color: #0969bd;
-	box-shadow: none;
-}
-
 @media (max-width: 600px) {
 	.feed-header-inner {
 		flex-wrap: wrap;
