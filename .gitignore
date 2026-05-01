@@ -1,3 +1,5 @@
+.cache_audit/
+
 __pycache__/
 *.py[cod]
 .venv/
