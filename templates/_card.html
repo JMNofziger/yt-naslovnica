@@ -19,7 +19,18 @@
       <h2 class="card-title">
         <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
       </h2>
-      <span class="card-lang notranslate" translate="no">Language {{ item.language_abbr }} {{ item.language_flag_emoji }}</span>
+      <span
+        class="card-lang-badge{% if item.language_abbr == '—' %} card-lang-badge--unknown{% endif %} notranslate"
+        translate="no"
+        {% if item.language_abbr == '—' %}
+          aria-label="Spoken language not detected"
+        {% else %}
+          aria-label="Spoken language: {{ item.language_abbr }}"
+        {% endif %}
+      >
+        <span class="card-lang-flag" aria-hidden="true">{{ item.language_flag_emoji }}</span>
+        <span class="card-lang-code">{{ item.language_abbr }}</span>
+      </span>
     </div>
     <div class="card-meta">{{ item.channel }} · {{ item.published_label }}</div>
     <p class="card-summary">{{ item.summary }}</p>

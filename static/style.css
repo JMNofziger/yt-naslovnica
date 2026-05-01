@@ -104,13 +104,28 @@ body.feed-body {
 	background-color: #edeff1;
 }
 
-/* Secondary nav (About → GitHub README) */
-.feed-nav .nav-link-secondary {
-	font-weight: 500;
-	color: #787c7e;
+/* Desktop: About + Translate grouped on the right */
+.feed-header-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: nowrap;
+	gap: 2px;
+	flex-shrink: 0;
+	margin-left: auto;
 }
 
-.feed-nav .nav-link-secondary:hover {
+/* Secondary link (About → GitHub README) next to Translate */
+.feed-header-actions .nav-link-secondary {
+	font-weight: 500;
+	color: #787c7e;
+	display: inline-block;
+	padding: 6px 10px;
+	border-radius: 4px;
+	text-decoration: none;
+	font-size: 14px;
+}
+
+.feed-header-actions .nav-link-secondary:hover {
 	color: #0079d3;
 	background-color: #f6f7f8;
 }
@@ -127,7 +142,6 @@ body.feed-body {
 /* Google Translate: tucked behind disclosure so header stays calm */
 .translate-disclosure.translate-disclosure--desktop {
 	flex-shrink: 0;
-	margin-left: auto;
 	position: relative;
 }
 
@@ -316,6 +330,10 @@ body.feed-body {
 	}
 
 	.nav-archive-desktop {
+		display: none !important;
+	}
+
+	.feed-header-actions {
 		display: none !important;
 	}
 

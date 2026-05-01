@@ -19,23 +19,27 @@
           <a href="{{ url_for('archive') }}" class="nav-archive-desktop {% if active_archive %}active{% endif %}">Archive</a>
         </nav>
       </div>
-      <details class="translate-disclosure translate-disclosure--desktop notranslate" translate="no">
-        <summary class="translate-summary">
-          <span class="translate-summary-label">Translate page</span>
-        </summary>
-        <div class="translate-panel translate-panel-host">
-          <p class="translate-panel-hint">Uses Google Translate in your browser (third‑party).</p>
-          <div id="translate-slot-desktop">
-            <div id="google_translate_element"></div>
+      <div class="feed-header-actions notranslate" translate="no">
+        <a href="{{ github_repo_url }}" class="nav-about-desktop nav-link-secondary" target="_blank" rel="noopener noreferrer">About</a>
+        <details class="translate-disclosure translate-disclosure--desktop">
+          <summary class="translate-summary">
+            <span class="translate-summary-label">Translate page</span>
+          </summary>
+          <div class="translate-panel translate-panel-host">
+            <p class="translate-panel-hint">Uses Google Translate in your browser (third‑party).</p>
+            <div id="translate-slot-desktop">
+              <div id="google_translate_element"></div>
+            </div>
           </div>
-        </div>
-      </details>
+        </details>
+      </div>
       <details class="header-menu-mobile notranslate" translate="no">
         <summary class="header-menu-mobile-trigger" aria-label="Menu" title="Menu">
           <span class="header-menu-mobile-icon" aria-hidden="true">☰</span>
         </summary>
         <div class="header-menu-mobile-panel">
           <a href="{{ url_for('archive') }}" class="header-menu-mobile-link {% if active_archive %}active{% endif %}">Archive</a>
+          <a href="{{ github_repo_url }}" class="header-menu-mobile-link nav-link-secondary" target="_blank" rel="noopener noreferrer">About</a>
           <div class="header-menu-mobile-translate translate-panel-host">
             <p class="translate-panel-hint">Uses Google Translate in your browser (third‑party).</p>
             <div id="translate-slot-mobile"></div>

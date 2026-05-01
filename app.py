@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# README / architecture docs linked from header "About".
+GITHUB_REPO_URL = "https://github.com/JMNofziger/yt-naslovnica"
+
+
+@app.context_processor
+def inject_repo_url():
+    return {"github_repo_url": GITHUB_REPO_URL}
+
+
 PROJECT_ID = (
     os.environ.get("GOOGLE_CLOUD_PROJECT")
     or os.environ.get("GCP_PROJECT")
