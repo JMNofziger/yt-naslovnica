@@ -10,19 +10,36 @@
   <header class="feed-header">
     <div class="feed-header-inner">
       <div class="feed-header-start notranslate" translate="no">
-        <a href="{{ url_for('index') }}" class="feed-logo">Youtube Naslovnica</a>
+        <a href="{{ url_for('index') }}" class="feed-logo">
+          <span class="feed-logo-full">Youtube Naslovnica</span>
+          <span class="feed-logo-compact">YT Naslovnica</span>
+        </a>
         <nav class="feed-nav">
           <a href="{{ url_for('index') }}" class="{% if active_feed %}active{% endif %}">Feed</a>
-          <a href="{{ url_for('archive') }}" class="{% if active_archive %}active{% endif %}">Archive</a>
+          <a href="{{ url_for('archive') }}" class="nav-archive-desktop {% if active_archive %}active{% endif %}">Archive</a>
         </nav>
       </div>
-      <details class="translate-disclosure notranslate" translate="no">
+      <details class="translate-disclosure translate-disclosure--desktop notranslate" translate="no">
         <summary class="translate-summary">
           <span class="translate-summary-label">Translate page</span>
         </summary>
-        <div class="translate-panel">
+        <div class="translate-panel translate-panel-host">
           <p class="translate-panel-hint">Uses Google Translate in your browser (third‑party).</p>
-          <div id="google_translate_element"></div>
+          <div id="translate-slot-desktop">
+            <div id="google_translate_element"></div>
+          </div>
+        </div>
+      </details>
+      <details class="header-menu-mobile notranslate" translate="no">
+        <summary class="header-menu-mobile-trigger" aria-label="Menu" title="Menu">
+          <span class="header-menu-mobile-icon" aria-hidden="true">☰</span>
+        </summary>
+        <div class="header-menu-mobile-panel">
+          <a href="{{ url_for('archive') }}" class="header-menu-mobile-link {% if active_archive %}active{% endif %}">Archive</a>
+          <div class="header-menu-mobile-translate translate-panel-host">
+            <p class="translate-panel-hint">Uses Google Translate in your browser (third‑party).</p>
+            <div id="translate-slot-mobile"></div>
+          </div>
         </div>
       </details>
     </div>
@@ -31,13 +48,28 @@
     {% block content %}{% endblock %}
   </main>
   <script type="text/javascript">
+    function syncTranslateWidgetSlot() {
+      var mq = window.matchMedia("(max-width: 720px)");
+      var el = document.getElementById("google_translate_element");
+      var desk = document.getElementById("translate-slot-desktop");
+      var mob = document.getElementById("translate-slot-mobile");
+      if (!el || !desk || !mob) return;
+      (mq.matches ? mob : desk).appendChild(el);
+    }
+    var _twTimer;
+    window.addEventListener("resize", function () {
+      clearTimeout(_twTimer);
+      _twTimer = setTimeout(syncTranslateWidgetSlot, 120);
+    });
+
     function googleTranslateElementInit() {
       new google.translate.TranslateElement({
-        pageLanguage: 'en',
-        includedLanguages: 'hr,bs,sr,sl,sq,mk,de,it,fr,es,pl,uk,nl',
+        pageLanguage: "en",
+        includedLanguages: "hr,bs,sr,sl,sq,mk,de,it,fr,es,pl,uk,nl",
         layout: google.translate.TranslateElement.InlineLayout.DROPDOWN,
         autoDisplay: false,
-      }, 'google_translate_element');
+      }, "google_translate_element");
+      syncTranslateWidgetSlot();
     }
   </script>
   <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit&amp;hl=en"></script>

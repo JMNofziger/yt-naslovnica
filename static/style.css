@@ -38,17 +38,17 @@ body.feed-body {
 	margin: 0 auto;
 	padding: 10px 16px;
 	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 12px 16px;
+	align-items: center;
+	justify-content: flex-start;
+	flex-wrap: nowrap;
+	gap: 10px;
 }
 
 .feed-header-start {
 	display: flex;
 	align-items: center;
-	flex-wrap: wrap;
-	gap: 8px 16px;
+	flex-wrap: nowrap;
+	gap: 8px 12px;
 	flex: 1 1 auto;
 	min-width: 0;
 }
@@ -58,6 +58,22 @@ body.feed-body {
 	font-size: 18px;
 	color: #ff4500;
 	text-decoration: none;
+	min-width: 0;
+	flex-shrink: 1;
+}
+
+.feed-logo-full,
+.feed-logo-compact {
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	vertical-align: bottom;
+}
+
+.feed-logo-compact {
+	display: none;
 }
 
 .feed-logo:hover {
@@ -67,6 +83,8 @@ body.feed-body {
 .feed-nav {
 	display: flex;
 	gap: 12px;
+	flex-shrink: 0;
+	align-items: center;
 }
 
 .feed-nav a {
@@ -87,7 +105,7 @@ body.feed-body {
 }
 
 /* Google Translate: tucked behind disclosure so header stays calm */
-.translate-disclosure {
+.translate-disclosure.translate-disclosure--desktop {
 	flex-shrink: 0;
 	margin-left: auto;
 	position: relative;
@@ -144,19 +162,19 @@ body.feed-body {
 }
 
 /* Google-injected markup — normalize to match site typography */
-.translate-panel .goog-te-gadget {
+.translate-panel-host .goog-te-gadget {
 	font-family: inherit !important;
 	font-size: 13px !important;
 	color: #1a1a1b !important;
 }
 
-.translate-panel .goog-te-gadget-simple .goog-te-menu-value,
-.translate-panel .goog-te-gadget-simple .goog-te-menu-value span {
+.translate-panel-host .goog-te-gadget-simple .goog-te-menu-value,
+.translate-panel-host .goog-te-gadget-simple .goog-te-menu-value span {
 	color: #1a1a1b !important;
 	border-color: transparent !important;
 }
 
-.translate-panel .goog-te-combo {
+.translate-panel-host .goog-te-combo {
 	margin: 0 !important;
 	width: 100% !important;
 	max-width: 100% !important;
@@ -171,12 +189,123 @@ body.feed-body {
 	cursor: pointer !important;
 }
 
-.translate-panel .goog-te-gadget-icon {
+.translate-panel-host .goog-te-gadget-icon {
 	display: none !important;
 }
 
-.translate-panel .goog-te-banner-frame.skiptranslate {
+.translate-panel-host .goog-te-banner-frame.skiptranslate {
 	display: none !important;
+}
+
+/* Mobile overflow menu (Archive + Translate widget slot) */
+.header-menu-mobile {
+	display: none;
+	flex-shrink: 0;
+	margin-left: auto;
+	position: relative;
+}
+
+.header-menu-mobile-trigger {
+	list-style: none;
+	cursor: pointer;
+	user-select: none;
+}
+
+.header-menu-mobile-trigger::-webkit-details-marker {
+	display: none;
+}
+
+.header-menu-mobile-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 36px;
+	font-size: 18px;
+	line-height: 1;
+	color: #0079d3;
+	font-weight: 600;
+	border-radius: 4px;
+}
+
+.header-menu-mobile-trigger:hover .header-menu-mobile-icon,
+.header-menu-mobile[open] .header-menu-mobile-icon {
+	background-color: #f6f7f8;
+	color: #1a1a1b;
+}
+
+.header-menu-mobile-panel {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 6px);
+	z-index: 40;
+	min-width: min(280px, calc(100vw - 24px));
+	max-width: calc(100vw - 24px);
+	padding: 12px 14px;
+	background: #fff;
+	border: 1px solid #edeff1;
+	border-radius: 8px;
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.header-menu-mobile-link {
+	display: block;
+	padding: 10px 10px;
+	margin: -4px -4px 10px;
+	font-weight: 600;
+	color: #0079d3;
+	text-decoration: none;
+	border-radius: 4px;
+}
+
+.header-menu-mobile-link:hover {
+	background-color: #f6f7f8;
+}
+
+.header-menu-mobile-link.active {
+	color: #1a1a1b;
+	background-color: #edeff1;
+}
+
+.header-menu-mobile-translate {
+	padding-top: 10px;
+	border-top: 1px solid #edeff1;
+	margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+	.feed-logo-compact {
+		display: inline-block !important;
+	}
+
+	.feed-logo-full {
+		display: none !important;
+	}
+
+	.feed-header-inner {
+		padding-inline: 12px;
+		gap: 8px;
+	}
+
+	.feed-logo {
+		font-size: 16px;
+	}
+
+	.feed-nav {
+		gap: 8px;
+	}
+
+	.nav-archive-desktop {
+		display: none !important;
+	}
+
+	.translate-disclosure.translate-disclosure--desktop {
+		display: none !important;
+	}
+
+	.header-menu-mobile {
+		display: block;
+	}
 }
 
 .feed-main {
