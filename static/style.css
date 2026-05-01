@@ -29,9 +29,19 @@
 	margin: 0 auto;
 	padding: 10px 16px;
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	justify-content: space-between;
-	gap: 16px;
+	flex-wrap: wrap;
+	gap: 12px 16px;
+}
+
+.feed-header-start {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .feed-logo {
@@ -65,6 +75,28 @@
 .feed-nav a.active {
 	color: #1a1a1b;
 	background-color: #edeff1;
+}
+
+.header-translate {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+	margin-left: auto;
+}
+
+.translate-label {
+	font-size: 12px;
+	color: #787c7e;
+	white-space: nowrap;
+}
+
+#google_translate_element {
+	min-height: 28px;
+}
+
+.goog-te-gadget {
+	font-size: 12px !important;
 }
 
 .feed-main {

@@ -20,6 +20,10 @@ If you see **`404 The database (default) does not exist`**, the database was nev
 
 Until Firestore exists, the feed, archive, votes, and ingestion cannot persist data.
 
+### Page translation (visitors)
+
+The layout loads Google’s **Website Translator** widget (third‑party script from `translate.google.com`). Visitors can choose a language from the header dropdown to translate visible page text in the browser. This is a lightweight MVP; it is **not** a substitute for professional localization or GDPR/consent review if you need those later.
+
 ### Provision with gcloud (script)
 
 From `youtube-summarizer-1`:
@@ -85,7 +89,7 @@ Create a **YouTube Data API key** under APIs & Services → Credentials (Console
 
 ### Firestore
 
-Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title`, `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. The **active feed** shows items whose **`published_at` is within the last `FEED_DAYS`** (default **30**, override with env `FEED_DAYS`); older items appear under `/archive`.
+Use Native mode. Collection `feed_items`, document id = YouTube video id. Fields: `title_raw` (original YouTube title), **`title`** (concise English card headline from Gemini), `url`, `channel`, `published_at`, `summary`, `upvotes`, `downvotes`. The **active feed** shows items whose **`published_at` is within the last `FEED_DAYS`** (default **30**, override with env `FEED_DAYS`); older items appear under `/archive`.
 
 ### Local run
 

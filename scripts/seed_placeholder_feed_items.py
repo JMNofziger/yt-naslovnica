@@ -37,6 +37,7 @@ def main() -> None:
         {
             "doc_id": "SEED_BOOTSTRAP_CARD",
             "data": {
+                "title_raw": "Next step: add YOUTUBE_API_KEY and run ingestion",
                 "title": "Next step: add YOUTUBE_API_KEY and run ingestion",
                 "url": "https://www.youtube.com/watch?v=M7FIvfx5J10",
                 "channel": "Seed script",
@@ -54,6 +55,7 @@ def main() -> None:
         {
             "doc_id": "SEED_SECOND_CARD",
             "data": {
+                "title_raw": "Firestore is connected — feed queries work",
                 "title": "Firestore is connected — feed queries work",
                 "url": "https://www.youtube.com/watch?v=M7FIvfx5J10",
                 "channel": "Seed script",

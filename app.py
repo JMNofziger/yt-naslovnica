@@ -40,18 +40,35 @@ DEFAULT_CHANNEL_SOURCES = (
     # News / national broadcaster / Zagreb tourism / regions (all Croatia-scoped)
     "https://www.youtube.com/@TotalCroatiaNews/videos",
     "https://www.youtube.com/@Hrvatskaradiotelevizija_HRT/videos",
+    "https://www.youtube.com/@vecernjiTV/videos",
+    "https://www.youtube.com/@RTLdan/videos",
+    "https://www.youtube.com/@RTLTelevizija/videos",
+    "https://www.youtube.com/@TelegrafVIDEO/videos",
+    "https://www.youtube.com/@TelegramVIDEO/videos",
+    "https://www.youtube.com/@Hrvatskadanas/videos",
+    "https://www.youtube.com/@ZagrebNews/videos",
+    "https://www.youtube.com/@OtvoreniRadio/videos",
+    "https://www.youtube.com/@N1hr/videos",
+    "https://www.youtube.com/@Hrvatskapolitika/videos",
     "https://www.youtube.com/@dubrovniktimes/videos",
     "https://www.youtube.com/@VisitZagreb/videos",
     "https://www.youtube.com/@CroatiaFullOfLife/videos",
     "https://www.youtube.com/@ZagrebExplorer/videos",
     "https://www.youtube.com/@CroatiaUncovered/videos",
     "https://www.youtube.com/@KorculaExplorer/videos",
+    "https://www.youtube.com/@SplitLiving/videos",
 )
 
 _CHANNEL_ID_UC = re.compile(r"^UC[a-zA-Z0-9_-]{22}$")
 _HANDLE_IN_URL = re.compile(
     r"(?:https?://)?(?:www\.)?youtube\.com/@([^/?#]+)", re.I
 )
+
+# Remove hashtag spam / repeated tags from titles (always applied on display + ingest fallback).
+_TITLE_HASHTAG_RUN = re.compile(
+    r"(?:[#＃][\w\u0100-\u024f\u0400-\u04FF.-]+\s*)+", re.UNICODE
+)
+_TITLE_MULTI_SPACE = re.compile(r"\s{2,}")
 
 _fs_client = None
 
@@ -180,6 +197,59 @@ def generate_summary(youtube_link: str, extra: str = " ") -> str:
     ).text
 
 
+def sanitize_plain_card_title(raw: str | None, max_len: int = 160) -> str:
+    """Strip hashtags / noisy spacing for safe card display."""
+    s = (raw or "").strip()
+    if not s:
+        return "(untitled)"
+    s = _TITLE_HASHTAG_RUN.sub(" ", s)
+    s = _TITLE_MULTI_SPACE.sub(" ", s).strip()
+    if len(s) > max_len:
+        s = s[:max_len].rstrip()
+    return s or "(untitled)"
+
+
+def concise_english_card_title(raw_title: str) -> str:
+    """
+    Short English headline for cards via Gemini (text-only). Falls back to sanitized raw title.
+    """
+    raw_title = (raw_title or "").strip()
+    if not raw_title:
+        return "(untitled)"
+
+    cfg = types.GenerateContentConfig(
+        temperature=0.2,
+        top_p=0.9,
+        max_output_tokens=160,
+        response_modalities=["TEXT"],
+    )
+    prompt = (
+        "Turn this YouTube video title into a concise English headline for a news card.\n"
+        "Hard rules:\n"
+        "- Output ONLY the headline as plain text, one line. No quotes or punctuation wrappers.\n"
+        "- Aim for ~60–90 characters; shorter is fine.\n"
+        "- Remove ALL hashtags (#tags), emoji, clickbait filler ('must watch', excessive punctuation).\n"
+        "- Translate fully into natural English if the title is not English.\n\n"
+        "Original title:\n"
+        f"{raw_title}"
+    )
+    contents = [types.Part.from_text(text=prompt)]
+    try:
+        out = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=contents,
+            config=cfg,
+        ).text
+        line = (out or "").strip().splitlines()[0].strip().strip("\"'")
+        head = sanitize_plain_card_title(line, max_len=160)
+        if len(head) < 4:
+            raise ValueError("title too short")
+        return head
+    except Exception as exc:
+        logger.warning("English card title generation failed, using fallback: %s", exc)
+        return sanitize_plain_card_title(raw_title)
+
+
 def parse_youtube_published_at(raw: str) -> datetime:
     """RFC3339 from YouTube Data API."""
     if raw.endswith("Z"):
@@ -239,10 +309,13 @@ def load_items_for_feed(*, active: bool):
         pub = normalize_published(d.get("published_at"))
         up = int(d.get("upvotes") or 0)
         down = int(d.get("downvotes") or 0)
+        stored = d.get("title")
+        raw_yt = d.get("title_raw")
+        card_title = sanitize_plain_card_title(stored or raw_yt or "(untitled)")
         items.append(
             {
                 "id": pid,
-                "title": d.get("title") or "(untitled)",
+                "title": card_title,
                 "url": d.get("url") or youtube_watch_url(pid),
                 "channel": d.get("channel") or "",
                 "summary": d.get("summary") or "",
@@ -451,6 +524,8 @@ def perform_ingestion() -> tuple[dict, int]:
         if ref.get().exists:
             continue
         watch = youtube_watch_url(vid)
+        raw_title = row.get("title") or ""
+        card_headline = concise_english_card_title(raw_title)
         try:
             summary = generate_summary(watch, " ")
         except Exception as e:
@@ -463,7 +538,8 @@ def perform_ingestion() -> tuple[dict, int]:
             pub_dt = utcnow()
         ref.set(
             {
-                "title": row["title"],
+                "title_raw": raw_title,
+                "title": card_headline,
                 "url": watch,
                 "channel": row["channel_title"],
                 "published_at": pub_dt,

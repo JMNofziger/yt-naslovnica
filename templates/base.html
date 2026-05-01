@@ -9,15 +9,32 @@
 <body class="feed-body">
   <header class="feed-header">
     <div class="feed-header-inner">
-      <a href="{{ url_for('index') }}" class="feed-logo">YouTube Newsfeed</a>
-      <nav class="feed-nav">
-        <a href="{{ url_for('index') }}" class="{% if active_feed %}active{% endif %}">Feed</a>
-        <a href="{{ url_for('archive') }}" class="{% if active_archive %}active{% endif %}">Archive</a>
-      </nav>
+      <div class="feed-header-start notranslate" translate="no">
+        <a href="{{ url_for('index') }}" class="feed-logo">YouTube Newsfeed</a>
+        <nav class="feed-nav">
+          <a href="{{ url_for('index') }}" class="{% if active_feed %}active{% endif %}">Feed</a>
+          <a href="{{ url_for('archive') }}" class="{% if active_archive %}active{% endif %}">Archive</a>
+        </nav>
+      </div>
+      <div class="header-translate notranslate" translate="no">
+        <span class="translate-label" title="Uses Google Translate in your browser">Page:</span>
+        <div id="google_translate_element" aria-label="Translate page"></div>
+      </div>
     </div>
   </header>
   <main class="feed-main">
     {% block content %}{% endblock %}
   </main>
+  <script type="text/javascript">
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: 'hr,bs,sr,sl,sq,mk,de,it,fr,es,pl,uk,nl',
+        layout: google.translate.TranslateElement.InlineLayout.DROPDOWN,
+        autoDisplay: false,
+      }, 'google_translate_element');
+    }
+  </script>
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
 </html>
