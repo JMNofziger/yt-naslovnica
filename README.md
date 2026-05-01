@@ -18,6 +18,52 @@ If you see **`404 The database (default) does not exist`**, the database was nev
 
 Until Firestore exists, the feed, archive, votes, and ingestion cannot persist data.
 
+### Provision with gcloud (script)
+
+From `youtube-summarizer-1`:
+
+```bash
+export GOOGLE_CLOUD_PROJECT=summarizer-lab   # or your real project id
+chmod +x scripts/setup_gcp_infrastructure.sh
+./scripts/setup_gcp_infrastructure.sh        # or: ./scripts/setup_gcp_infrastructure.sh YOUR_PROJECT_ID
+```
+
+Optional: `FIRESTORE_LOCATION=europe-west3 ./scripts/setup_gcp_infrastructure.sh` if you want another [Firestore region](https://cloud.google.com/firestore/docs/locations).
+
+### Provision manually (same steps)
+
+```bash
+PROJECT_ID=summarizer-lab   # change me
+REGION=europe-west1         # Firestore location; aligns with default Vertex region in app.py
+
+gcloud services enable \
+  --project="$PROJECT_ID" \
+  firestore.googleapis.com \
+  aiplatform.googleapis.com \
+  youtube.googleapis.com \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  iam.googleapis.com
+
+gcloud firestore databases create --project="$PROJECT_ID" --location="$REGION"
+
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+RUNTIME_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${RUNTIME_SA}" \
+  --role="roles/datastore.user" \
+  --quiet
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${RUNTIME_SA}" \
+  --role="roles/aiplatform.user" \
+  --quiet
+```
+
+Create a **YouTube Data API key** under APIs & Services → Credentials (Console). Set Cloud Run env vars (`YOUTUBE_API_KEY`, etc.) per below.
+
 ### Environment variables
 
 | Variable | Required | Description |
