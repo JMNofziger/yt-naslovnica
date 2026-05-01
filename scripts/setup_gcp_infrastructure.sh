@@ -18,6 +18,9 @@
 
 set -euo pipefail
 
+# Avoid interactive "Enable API? (y/N)" prompts in Cursor / CI terminals.
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+
 PROJECT_ID="${1:-${GOOGLE_CLOUD_PROJECT:-${GCP_PROJECT:-}}}"
 if [[ -z "${PROJECT_ID}" ]]; then
   echo "Error: set GOOGLE_CLOUD_PROJECT or pass PROJECT_ID as first argument." >&2
@@ -32,13 +35,16 @@ echo "Firestore location (Native): ${FIRESTORE_LOCATION}"
 echo ">> Enabling APIs (idempotent)..."
 gcloud services enable \
   --project="${PROJECT_ID}" \
+  --quiet \
   firestore.googleapis.com \
   aiplatform.googleapis.com \
   youtube.googleapis.com \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
-  iam.googleapis.com
+  iam.googleapis.com \
+  secretmanager.googleapis.com \
+  cloudscheduler.googleapis.com
 
 echo ">> Ensuring Firestore Native (default) database exists..."
 if gcloud firestore databases describe --project="${PROJECT_ID}" >/dev/null 2>&1; then

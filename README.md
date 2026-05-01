@@ -38,19 +38,28 @@ Optional: `FIRESTORE_LOCATION=europe-west3 ./scripts/setup_gcp_infrastructure.sh
 
 ### Provision manually (same steps)
 
+Use non-interactive defaults so **`gcloud`** never blocks on **`Would you like to enable and retry (y/N)?`** (common when Cloud Scheduler API is off):
+
+```bash
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+```
+
 ```bash
 PROJECT_ID=summarizer-lab   # change me
 REGION=europe-west1         # Firestore location; aligns with default Vertex region in app.py
 
 gcloud services enable \
   --project="$PROJECT_ID" \
+  --quiet \
   firestore.googleapis.com \
   aiplatform.googleapis.com \
   youtube.googleapis.com \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
-  iam.googleapis.com
+  iam.googleapis.com \
+  secretmanager.googleapis.com \
+  cloudscheduler.googleapis.com
 
 gcloud firestore databases create --project="$PROJECT_ID" --location="$REGION"
 
@@ -108,7 +117,7 @@ chmod +x scripts/sync_hackathon_ingest_scheduler.sh
 ./scripts/sync_hackathon_ingest_scheduler.sh   # default job: hackathon-feed-ingest, 06:00 UTC daily
 ```
 
-*(Script reads the latest secret via `gcloud secrets versions access` and passes `--quiet >/dev/null` to Scheduler commands so header values are not printed.)*
+*(The script sets **`CLOUDSDK_CORE_DISABLE_PROMPTS=1`**, pre-enables **Scheduler + Secret Manager** APIs with **`--quiet`**, and by default discards Scheduler **`gcloud`** stdout so secrets are not copied into shared logs. On your laptop you can run **`INGEST_SCHEDULER_VERBOSE=1 ./scripts/sync_hackathon_ingest_scheduler.sh`** to print the full job resource to stderr.)*
 
 ### Local run
 
